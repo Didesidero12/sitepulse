@@ -1,4 +1,4 @@
-// app/page.js  ← THIS IS YOUR HOMEPAGE
+// app/page.js  ← HOMEPAGE (fixed for Netlify build)
 import Link from 'next/link';
 
 export default function Home() {
@@ -21,16 +21,30 @@ export default function Home() {
 
         <div className="bg-gray-800 p-16 rounded-3xl shadow-2xl">
           <p className="text-2xl mb-8 text-center">Have a Project ID?</p>
-          <input
-            placeholder="Enter 6-digit ID (e.g., H0FMN9)"
-            className="w-full p-6 bg-gray-700 rounded-xl text-4xl text-center tracking-widest font-mono"
-            maxLength={6}
-            onKeyUp={(e) => {
-              if (e.key === 'Enter' && e.target.value.length === 6) {
-                window.location.href = `/join/${e.target.value.toUpperCase()}`;
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const input = e.target.elements.id;
+              if (input.value.length === 6) {
+                window.location.href = `/join/${input.value.toUpperCase()}`;
               }
             }}
-          />
+            className="flex flex-col items-center"
+          >
+            <input
+              name="id"
+              placeholder="H0FMN9"
+              maxLength={6}
+              required
+              className="w-full p-6 bg-gray-700 rounded-xl text-4xl text-center tracking-widest font-mono mb-6"
+            />
+            <button
+              type="submit"
+              className="w-full bg-orange-600 hover:bg-orange-500 py-6 rounded-xl text-3xl font-bold"
+            >
+              Join Project →
+            </button>
+          </form>
         </div>
       </div>
     </div>
