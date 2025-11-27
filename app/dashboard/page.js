@@ -1,83 +1,98 @@
+// app/dashboard/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const times = ['7:00', '7:30', '8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
+const hours = Array.from({ length: 10 }, (_, i) => `${i + 7}:00`);
 
 export default function Dashboard() {
   const [deliveries, setDeliveries] = useState({});
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "deliveries"), (snapshot) => {
+    const unsub = onSnapshot(collection(db, "deliveries"), (snap) => {
       const data = {};
-      snapshot.forEach(doc => {
+      snap.forEach((doc) => {
         const d = doc.data();
-        const key = `${d.day}-${d.time}`;
-        data[key] = { ...d, id: doc.id };
+        data[`${d.day}-${d.time}`] = { ...d, id: doc.id };
       });
       setDeliveries(data);
     });
     return unsub;
   }, []);
 
-  const bookSlot = async (day, time) => {
-    const material = prompt("Material (e.g., Drywall – PCI)");
-    const qty = prompt("Quantity / notes (e.g., 40 sheets)");
+  const book = async (day, time) => {
+    const material = prompt("Material (e.g., Doors – Italy)");
+    const notes = prompt("Quantity / notes (e.g., 12 bifolds, call Joey 503-555-1234)");
     if (material) {
       await addDoc(collection(db, "deliveries"), {
         day,
         time,
         material,
-        qty,
-        bookedBy: "Sub",
-        timestamp: serverTimestamp()
+        notes: notes || "",
+        timestamp: serverTimestamp(),
       });
     }
+    setSelected(null);
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <h1 className="text-6xl font-bold mb-8 text-center">HOFFMAN-PILOT – LIVE WHITEBOARD</h1>
+    <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl md:text-6xl font-bold text-center mb-2">HOFFMAN-PILOT</h1>
+        <p className="text-center text-orange-400 text-xl mb-8">Live Delivery Whiteboard</p>
 
-      <div className="max-w-7xl mx-auto bg-gray-800 rounded-2xl p-8 border-4 border-orange-600">
-        <table className="w-full table-fixed text-2xl text-center border-4 border-gray-600">
-          <thead className="bg-gray-700">
-            <tr>
-              {days.map(d => <th key={d} className="p-4 border-r-4 border-gray-600">{d}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {times.map(time => (
-              <tr key={time} className="border-t-4 border-gray-600">
-                {days.map(day => {
-                  const key = `${day}-${time}`;
-                  const delivery = deliveries[key];
-                  return (
-                    <td
-                      key={key}
-                      className={`p-6 h-24 cursor-pointer transition-all
-                        ${delivery ? 'bg-orange-600 hover:bg-orange-500' : 'hover:bg-gray-700'}`}
-                      onClick={() => !delivery && bookSlot(day, time)}
-                    >
-                      {delivery ? (
-                        <div>
-                          <div className="font-bold">{time}</div>
-                          <div>{delivery.material}</div>
-                          <div className="text-sm">{delivery.qty}</div>
-                        </div>
-                      ) : (
-                        <div className="text-gray-500">{time}</div>
-                      )}
-                    </td>
-                  );
-                })}
+        <div className="overflow-x-auto rounded-2xl shadow-2xl">
+          <table className="w-full table-fixed border-collapse">
+            <thead>
+              <tr className="bg-gray-800">
+                {days.map((d) => (
+                  <th key={d} className="p-4 text-2xl font-bold border-r border-gray-700 last:border-r-0">
+                    {d}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {hours.map((hour) => (
+                <tr key={hour} className="border-t-4 border-gray-800">
+                  {days.map((day) => {
+                    const key = `${day}-${hour}`;
+                    const delivery = deliveries[key];
+                    const isSelected = selected === key;
+
+                    return (
+                      <td
+                        key={key}
+                        onClick={() => !delivery && setSelected(key)}
+                        className={`p-4 h-32 text-center transition-all cursor-pointer
+                          ${delivery ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-800 hover:bg-gray-700'}
+                          ${isSelected ? 'ring-4 ring-blue-500' : ''}`}
+                      >
+                        {delivery ? (
+                          <div>
+                            <div className="font-bold text-lg">{hour}</div>
+                            <div className="font-semibold">{delivery.material}</div>
+                            <div className="text-sm opacity-90">{delivery.notes}</div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-500">{hour}</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-center mt-8 text-gray-400">
+          Subs open this link on their phone → tap any empty slot → book delivery → super sees it instantly.
+        </p>
       </div>
     </div>
   );
