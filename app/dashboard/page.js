@@ -1,50 +1,83 @@
-import Image from 'next/image';
+"use client";
+
+import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const times = ['7:00', '7:30', '8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 export default function Dashboard() {
+  const [deliveries, setDeliveries] = useState({});
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "deliveries"), (snapshot) => {
+      const data = {};
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        const key = `${d.day}-${d.time}`;
+        data[key] = { ...d, id: doc.id };
+      });
+      setDeliveries(data);
+    });
+    return unsub;
+  }, []);
+
+  const bookSlot = async (day, time) => {
+    const material = prompt("Material (e.g., Drywall – PCI)");
+    const qty = prompt("Quantity / notes (e.g., 40 sheets)");
+    if (material) {
+      await addDoc(collection(db, "deliveries"), {
+        day,
+        time,
+        material,
+        qty,
+        bookedBy: "Sub",
+        timestamp: serverTimestamp()
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-10">
-      <h1 className="text-6xl font-bold mb-4">HOFFMAN-PILOT</h1>
-      <p className="text-2xl text-gray-400 mb-10">Demo Project – Live Whiteboard + Delivery Map</p>
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <h1 className="text-6xl font-bold mb-8 text-center">HOFFMAN-PILOT – LIVE WHITEBOARD</h1>
 
-      <div className="grid lg:grid-cols-2 gap-12 max-w-7xl mx-auto">
-        {/* Delivery Map */}
-        <div className="bg-gray-800 p-8 rounded-2xl border-4 border-green-600">
-          <h2 className="text-4xl font-bold mb-6 text-green-400">Delivery Map</h2>
-          <Image
-            src="/site-map.png"
-            alt="Site delivery map"
-            width={1200}
-            height={800}
-            className="rounded-xl border-8 border-green-500 shadow-2xl"
-          />
-          <p className="text-center mt-4 text-green-400 text-xl">
-            ↑ Green = Entry | Red = Exit | Blue = Unload Zone
-          </p>
-        </div>
-
-        {/* Whiteboard */}
-        <div className="bg-gray-800 p-8 rounded-2xl border-4 border-orange-600">
-          <h2 className="text-4xl font-bold mb-6 text-orange-400">This Week – Whiteboard</h2>
-          <table className="w-full table-fixed text-2xl text-center border-4 border-gray-600">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="p-4">Mon</th>
-                <th className="p-4">Tue</th>
-                <th className="p-4">Wed</th>
-                <th className="p-4">Thu</th>
-                <th className="p-4">Fri</th>
+      <div className="max-w-7xl mx-auto bg-gray-800 rounded-2xl p-8 border-4 border-orange-600">
+        <table className="w-full table-fixed text-2xl text-center border-4 border-gray-600">
+          <thead className="bg-gray-700">
+            <tr>
+              {days.map(d => <th key={d} className="p-4 border-r-4 border-gray-600">{d}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {times.map(time => (
+              <tr key={time} className="border-t-4 border-gray-600">
+                {days.map(day => {
+                  const key = `${day}-${time}`;
+                  const delivery = deliveries[key];
+                  return (
+                    <td
+                      key={key}
+                      className={`p-6 h-24 cursor-pointer transition-all
+                        ${delivery ? 'bg-orange-600 hover:bg-orange-500' : 'hover:bg-gray-700'}`}
+                      onClick={() => !delivery && bookSlot(day, time)}
+                    >
+                      {delivery ? (
+                        <div>
+                          <div className="font-bold">{time}</div>
+                          <div>{delivery.material}</div>
+                          <div className="text-sm">{delivery.qty}</div>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500">{time}</div>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-orange-600 h-32">
-                <td colSpan={5}>9:00 AM – Drywall – PCI (40 sheets)</td>
-              </tr>
-              <tr className="h-32 hover:bg-gray-700 cursor-pointer">
-                <td colSpan={5}>Click any cell to book a delivery</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
