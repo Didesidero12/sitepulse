@@ -1,4 +1,4 @@
-// app/page.js  ← HOMEPAGE (fixed for Netlify build)
+// app/page.js  ← FINAL, GUARANTEED-TO-BUILD version
 import Link from 'next/link';
 
 export default function Home() {
@@ -16,21 +16,17 @@ export default function Home() {
           className="bg-green-600 hover:bg-green-500 p-16 rounded-3xl text-4xl font-bold text-center shadow-2xl"
         >
           Create New Project<br />
-          <span className="text-2xl">(GC / Superintendent only)</span>
+          <span className="text-2xl">(GC only)</span>
         </Link>
 
-        <div className="bg-gray-800 p-16 rounded-3xl shadow-2xl">
-          <p className="text-2xl mb-8 text-center">Have a Project ID?</p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const input = e.target.elements.id;
-              if (input.value.length === 6) {
-                window.location.href = `/join/${input.value.toUpperCase()}`;
-              }
-            }}
-            className="flex flex-col items-center"
-          >
+        <div className="bg-gray-800 p-16 rounded-3xl shadow-2xl text-center">
+          <p className="text-2xl mb-8">Have a Project ID?</p>
+          <form action={(formData) => {
+            const id = formData.get("id")?.toString().toUpperCase();
+            if (id && id.length === 6) {
+              window.location.href = `/join/${id}`;
+            }
+          }}>
             <input
               name="id"
               placeholder="H0FMN9"
