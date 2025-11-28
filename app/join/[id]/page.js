@@ -14,7 +14,7 @@ export default function Join() {
   const go = (role) => {
     if (role === 'gc') {
       const entered = prompt("Enter 4-digit GC PIN");
-      if (entered === "1234") { // replace with real check later
+      if (entered === "1234") {
         router.push(`/project/${id}/gc`);
       } else {
         alert("Wrong PIN");
@@ -22,7 +22,7 @@ export default function Join() {
     } else if (role === 'sub') {
       router.push(`/project/${id}/sub`);
     } else if (role === 'driver') {
-      router.push(`/project/${id}/driver`);
+      router.push(`/project/${id}/driver`);  
     }
   };
 
