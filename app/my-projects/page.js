@@ -54,8 +54,9 @@ export default function MyProjects() {
 
         <div className="text-center mt-16">
           <Link
-            href="/create-project"
-            className="bg-green-600 hover:bg-green-500 px-12 py-8 rounded-2xl text-4xl font-bold"
+            key={p.id}
+            href={`/project/${p.id}`}
+            className="block bg-gray-800 rounded-2xl p-8 hover:bg-gray-700 transition-all shadow-xl"
           >
             + Create New Project
           </Link>
