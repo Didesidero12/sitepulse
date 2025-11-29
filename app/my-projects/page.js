@@ -37,17 +37,17 @@ export default function MyProjects() {
           ) : (
             projects.map((p) => (
               <Link
-                key={p.id}
-                href={`/project/${p.id}`}
-                className="block bg-gray-800 rounded-2xl p-8 hover:bg-gray-700 transition-all shadow-xl"
-              >
-                <h2 className="text-4xl font-bold mb-4">{p.name || "Unnamed Project"}</h2>
-                <p className="text-2xl text-orange-400 mb-2">ID: {p.id}</p>
-                <p className="text-xl text-gray-400">GC PIN: {p.pin}</p>
-                <p className="mt-6 text-green-400 font-semibold">
-                  Status: {p.status === "open" ? "OPEN" : "CLOSED"}
-                </p>
-              </Link>
+          key={p.id}
+           href={`/project/${p.projectId}`}
+            className="block bg-gray-800 rounded-2xl p-8 hover:bg-gray-700 transition-all shadow-xl"
+            >
+            <h2 className="text-4xl font-bold mb-4">{p.name || "Unnamed Project"}</h2>
+            <p className="text-2xl text-orange-400 mb-2">ID: {p.projectId}</p>
+           <p className="text-xl text-gray-400">GC PIN: {p.pin}</p>
+          <p className="mt-6 text-green-400 font-semibold">
+          Status: {p.status === "open" ? "OPEN" : "CLOSED"}
+          </p>
+        </Link>
             ))
           )}
         </div>
