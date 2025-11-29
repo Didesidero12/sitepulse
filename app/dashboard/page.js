@@ -2,60 +2,82 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import { db } from '@/app/lib/firebase';
+import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
-mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const times = ['7:00', '7:30', '8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 export default function Dashboard() {
-  const [drivers, setDrivers] = useState([]);
+  const [deliveries, setDeliveries] = useState({});
 
-  // Fake site location
-  const siteLocation = { lat: 45.5231, lng: -122.6765 };
-
-  // Fake driver data (in real: from Firestore)
   useEffect(() => {
-    setDrivers([
-      { id: "Truck #47", loc: { lat: 45.5, lng: -122.6 }, eta: "25 min", material: "Doors", forklift: true }
-    ]);
+    const unsub = onSnapshot(collection(db, "deliveries"), (snapshot) => {
+      const data = {};
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        const key = `${d.day}-${d.time}`;
+        data[key] = { ...d, id: doc.id };
+      });
+      setDeliveries(data);
+    });
+    return unsub;
   }, []);
 
-  // Map setup with driver dots
-  useEffect () => {
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: [siteLocation.lng, siteLocation.lat],
-      zoom: 10
-    });
-
-    new mapboxgl.Marker({ color: 'green' }).setLngLat([siteLocation.lng, siteLocation.lat]).addTo(map);
-
-    drivers.forEach(d => {
-      new mapboxgl.Marker({ color: 'blue' }).setLngLat([d.loc.lng, d.loc.lat]).addTo(map);
-    });
-  }, [drivers]);
+  const bookSlot = async (day, time) => {
+    const material = prompt("Material (e.g., Drywall – PCI)");
+    const qty = prompt("Quantity / notes (e.g., 40 sheets)");
+    if (material) {
+      await addDoc(collection(db, "deliveries"), {
+        day,
+        time,
+        material,
+        qty,
+        bookedBy: "Sub",
+        timestamp: serverTimestamp(),
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <h1 className="text-6xl font-bold mb-8">HOFFMAN-PILOT</h1>
-
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div className="bg-gray-800 p-8 rounded-2xl">
-          <h2 className="text-4xl font-bold mb-4">Live Driver Map</h2>
-          <div id="map" className="h-96 rounded-lg"></div>
-        </div>
-
-        <div className="bg-gray-800 p-8 rounded-2xl">
-          <h2 className="text-4xl font-bold mb-4">Incoming Deliveries</h2>
-          {drivers.map(d => (
-            <div key={d.id} className="bg-orange-600 p-4 rounded-lg mb-4">
-              <p className="text-2xl">{d.id} – {d.material}</p>
-              <p className="text-xl">ETA: {d.eta}</p>
-              <p className="text-red-300">{d.forklift ? "Forklift Needed" : ""}</p>
-            </div>
-          ))}
-        </div>
+      <div className="max-w-7xl mx-auto overflow-x-auto rounded-2xl shadow-2xl">
+        <table className="w-full table-fixed text-2xl text-center border-4 border-gray-600">
+          <thead className="bg-gray-700">
+            <tr>
+              {days.map(d => <th key={d} className="p-4 border-r-4 border-gray-600 last:border-r-0">{d}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {times.map(time => (
+              <tr key={time} className="border-t-4 border-gray-600">
+                {days.map(day => {
+                  const key = `${day}-${time}`;
+                  const delivery = deliveries[key];
+                  return (
+                    <td
+                      key={key}
+                      className={`p-6 h-24 cursor-pointer transition-all
+                        ${delivery ? 'bg-orange-600 hover:bg-orange-500' : 'hover:bg-gray-700'}
+                        border-l-4 border-gray-600 first:border-l-0`}
+                      onClick={() => !delivery && bookSlot(day, time)}
+                    >
+                      {delivery ? (
+                        <div>
+                          <div className="font-bold">{time}</div>
+                          <div>{delivery.material}</div>
+                          <div className="text-sm">{delivery.qty}</div>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500">{time}</div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
