@@ -2,83 +2,60 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { db } from '@/app/lib/firebase';
-import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const hours = Array.from({ length: 10 }, (_, i) => `${i + 7}:00`);
+mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
 export default function Dashboard() {
-  const [deliveries, setDeliveries] = useState({});
+  const [drivers, setDrivers] = useState([]);
 
+  // Fake site location
+  const siteLocation = { lat: 45.5231, lng: -122.6765 };
+
+  // Fake driver data (in real: from Firestore)
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "deliveries"), (snap) => {
-      const data = {};
-      snap.forEach((doc) => {
-        const d = doc.data();
-        data[`${d.day}-${d.time}`] = d;
-      });
-      setDeliveries(data);
-    });
-    return unsub;
+    setDrivers([
+      { id: "Truck #47", loc: { lat: 45.5, lng: -122.6 }, eta: "25 min", material: "Doors", forklift: true }
+    ]);
   }, []);
 
-  const bookSlot = async (day, time) => {
-    const material = prompt("Material (e.g., Doors – Italy)");
-    const notes = prompt("Notes / qty");
-    if (material) {
-      await addDoc(collection(db, "deliveries"), {
-        day,
-        time,
-        material,
-        notes: notes || "",
-        timestamp: serverTimestamp(),
-      });
-    }
-  };
+  // Map setup with driver dots
+  useEffect () => {
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [siteLocation.lng, siteLocation.lat],
+      zoom: 10
+    });
+
+    new mapboxgl.Marker({ color: 'green' }).setLngLat([siteLocation.lng, siteLocation.lat]).addTo(map);
+
+    drivers.forEach(d => {
+      new mapboxgl.Marker({ color: 'blue' }).setLngLat([d.loc.lng, d.loc.lat]).addTo(map);
+    });
+  }, [drivers]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <h1 className="text-6xl text-center mb-8">HOFFMAN-PILOT – LIVE WHITEBOARD</h1>
+      <h1 className="text-6xl font-bold mb-8">HOFFMAN-PILOT</h1>
 
-      <div className="max-w-6xl mx-auto overflow-x-auto">
-        <table className="w-full table-fixed border-4 border-gray-700">
-          <thead className="bg-gray-800">
-            <tr>
-              {days.map((d) => (
-                <th key={d} className="p-4 text-2xl border-r-4 border-gray-700 last:border-r-0">{d}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {hours.map((hour) => (
-              <tr key={hour}>
-                {days.map((day) => {
-                  const key = `${day}-${hour}`;
-                  const d = deliveries[key];
-                  return (
-                    <td
-                      key={key}
-                      onClick={() => !d && bookSlot(day, hour)}
-                      className={`p-8 h-32 text-center cursor-pointer transition-all border-2 border-gray-700
-                        ${d ? 'bg-orange-600' : 'bg-gray-800 hover:bg-gray-700'}`}
-                    >
-                      {d ? (
-                        <div>
-                          <div className="font-bold">{hour}</div>
-                          <div>{d.material}</div>
-                          <div className="text-sm">{d.notes}</div>
-                        </div>
-                      ) : (
-                        <div className="text-gray-500">{hour}</div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="grid lg:grid-cols-2 gap-8">
+        <div className="bg-gray-800 p-8 rounded-2xl">
+          <h2 className="text-4xl font-bold mb-4">Live Driver Map</h2>
+          <div id="map" className="h-96 rounded-lg"></div>
+        </div>
+
+        <div className="bg-gray-800 p-8 rounded-2xl">
+          <h2 className="text-4xl font-bold mb-4">Incoming Deliveries</h2>
+          {drivers.map(d => (
+            <div key={d.id} className="bg-orange-600 p-4 rounded-lg mb-4">
+              <p className="text-2xl">{d.id} – {d.material}</p>
+              <p className="text-xl">ETA: {d.eta}</p>
+              <p className="text-red-300">{d.forklift ? "Forklift Needed" : ""}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
