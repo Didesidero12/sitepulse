@@ -4,3 +4,11 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[secrets]
+  ignore = [
+    ".next/**",
+    ".netlify/**",
+    "dist/**",
+    "build/**"
+  ]
