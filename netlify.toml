@@ -5,5 +5,18 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Override secrets scanner — Mapbox token is public and safe
-SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"
+# Ignore build artifacts (common false positives)
+[secrets.scan]
+  omit_paths = [
+    ".next/**",
+    ".netlify/**",
+    "dist/**",
+    "build/**",
+    ".cache/**"
+  ]
+
+# Explicitly omit the Mapbox token (public, safe)
+[secrets.scan]
+  omit_values = [
+    "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"
+  ]
