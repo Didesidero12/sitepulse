@@ -5,8 +5,10 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-[secrets.scan]
-  omit_paths = [".next/**", ".netlify/**", "dist/**", "build/**"]
-
+# Ignore Mapbox public token — it's safe
 [secrets.scan]
   omit_values = ["pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"]
+
+# Ignore build folders
+[secrets.scan]
+  omit_paths = [".next/**", ".netlify/**"]
