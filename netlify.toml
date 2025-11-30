@@ -5,4 +5,5 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+[build.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
