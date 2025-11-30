@@ -2,9 +2,9 @@
 "use client";
 
 import { useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '@/app/lib/firebase';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -12,94 +12,135 @@ mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZ
 
 export default function DriverView() {
   const { id } = useParams();
-  const [tracking, setTracking] = useState(false);
-  const [location, setLocation] = useState(null);
-  const [delivery, setDelivery] = useState(null);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const marker = useRef<mapboxgl.Marker | null>(null);
 
+  const [tracking, setTracking] = useState(false);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [delivery, setDelivery] = useState<any>(null);
+
+  // TODO: replace with real project site coordinates
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
+  // Fake delivery data — in real app this comes from booking or dispatch link
   useEffect(() => {
-    setDelivery({ material: "Doors from Italy", qty: "12 bifolds", needsForklift: true, eta: "30 min" });
+    setDelivery({
+      material: "Doors from Italy",
+      qty: "12 bifolds",
+      needsForklift: true,
+    });
   }, []);
 
+  // GPS Tracking
   useEffect(() => {
     if (!tracking) return;
+
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
+      async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
-        updateDoc(doc(db, "projects", id), { driverLocation: newLoc });
+
+        // Send location to Firestore in realtime
+        await updateDoc(doc(db, "projects", id), {
+          driverLocation: newLoc,
+          lastUpdate: serverTimestamp(),
+        });
+
         checkGeofence(newLoc);
       },
-      (err) => console.error(err),
-      { enableHighAccuracy: true }
+      (err) => console.error("GPS error:", err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
+
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking]);
+  }, [tracking, id]);
 
-  const checkGeofence = (loc) => {
+  // Geofencing alerts
+  const checkGeofence = (loc: { lat: number; lng: number }) => {
     const dist = getDistance(loc, siteLocation);
-    if (dist < 30 && dist > 15) alert("30 min out — forklift needed");
-    if (dist < 15 && dist > 5) alert("15 min out — prepare unload");
-    if (dist < 5) alert("5 min out — I'm here!");
+    if (dist < 30 && dist >= 15) alert("30 MIN OUT — FORKLIFT NEEDED");
+    if (dist < 15 && dist >= 5) alert("15 MIN OUT — PREPARE UNLOAD");
+    if (dist < 5) alert("5 MIN OUT — I'M HERE!");
   };
 
-  const getDistance = (loc1, loc2) => {
+  const getDistance = (loc1: any, loc2: any) => {
     const R = 3958.8; // miles
-    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
-    const dLon = (loc2.lng - loc1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(loc2.lat - loc1.lat);
+    const dLon = toRad(loc2.lng - loc1.lng);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(loc1.lat)) * Math.cos(toRad(loc2.lat)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
+  // Map Setup
   useEffect(() => {
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v11',
+    if (!mapContainer.current) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
       center: [siteLocation.lng, siteLocation.lat],
-      zoom: 10
+      zoom: 12,
     });
 
-    new mapboxgl.Marker({ color: 'green' }).setLngLat([siteLocation.lng, siteLocation.lat]).addTo(map);
+    // Site marker (green)
+    new mapboxgl.Marker({ color: "green" })
+      .setLngLat([siteLocation.lng, siteLocation.lat])
+      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+      .addTo(map.current);
 
+    // Driver marker (blue) — updates when location changes
     if (location) {
-      new mapboxgl.Marker({ color: 'blue' }).setLngLat([location.lng, location.lat]).addTo(map);
-      map.flyTo({ center: [location.lng, location.lat], zoom: 14 });
+      if (marker.current) marker.current.remove();
+      marker.current = new mapboxgl.Marker({ color: "blue" })
+        .setLngLat([location.lng, location.lat])
+        .addTo(map.current);
+      map.current.flyTo({ center: [location.lng, location.lat], zoom: 15 });
     }
 
-    return () => map.remove();
+    return () => map.current?.remove();
   }, [location]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-green-600 p-8 text-center">
+      {/* Header */}
+      <div className="bg-green-600 p-6 text-center">
         <h1 className="text-4xl font-bold">DRIVER MODE</h1>
-        <p className="text-2xl">Project {id}</p>
+        <p className="text-2xl opacity-90">Project {id}</p>
       </div>
 
-      <div className="p-8 space-y-8">
-        <div className="bg-gray-800 p-8 rounded-2xl text-center">
+      {/* Delivery Card */}
+      <div className="p-6">
+        <div className="bg-gray-800 rounded-2xl p-8 text-center">
           <h2 className="text-3xl font-bold text-green-400 mb-4">DELIVERY</h2>
-          <p className="text-4xl mb-2">{delivery?.material}</p>
-          <p className="text-2xl mb-4">{delivery?.qty}</p>
-          {delivery?.needsForklift && <p className="text-red-400 text-2xl">FORKLIFT NEEDED</p>}
+          <p className="text-5xl font-bold">{delivery?.material}</p>
+          <p className="text-3xl mt-2">{delivery?.qty}</p>
+          {delivery?.needsForklift && (
+            <p className="text-red-400 text-3xl mt-6 font-bold">FORKLIFT NEEDED</p>
+          )}
         </div>
+      </div>
 
-        <div className="bg-gray-800 p-8 rounded-2xl text-center">
-          <h2 className="text-3xl font-bold text-orange-400 mb-4">ETA</h2>
-          <p className="text-8xl font-black">{delivery?.eta}</p>
-        </div>
+      {/* Map */}
+      <div className="flex-1 px-6 pb-6">
+        <div ref={mapContainer} className="h-full rounded-2xl bg-gray-800" />
+      </div>
 
-        <div id="map" className="h-64 w-full rounded-2xl overflow-hidden bg-gray-800"></div>
-
-        <button onClick={() => setTracking(!tracking)} className={`${tracking ? 'bg-red-600' : 'bg-green-600'} hover:opacity-90 p-8 text-4xl font-bold rounded-2xl w-full`}>
-          {tracking ? "STOP TRACKING" : "START TRACKING →"}
+      {/* Action Buttons */}
+      <div className="p-6 space-y-6">
+        <button
+          onClick={() => setTracking(!tracking)}
+          className={`w-full py-8 text-5xl font-bold rounded-3xl transition ${
+            tracking ? "bg-red-600" : "bg-green-600"
+          }`}
+        >
+          {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
 
-        <button className="bg-blue-600 hover:bg-blue-500 p-8 text-4xl font-bold rounded-2xl w-full">
+        <button className="w-full bg-blue-600 py-8 text-5xl font-bold rounded-3xl">
           I’VE ARRIVED
         </button>
       </div>
