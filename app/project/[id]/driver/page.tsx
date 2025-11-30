@@ -69,44 +69,51 @@ export default function DriverView() {
     return R * c;
   };
 
-  // Map Setup with Debug
+  // Map Setup with Debug — FINAL WORKING VERSION
   useEffect(() => {
-  console.log("Map useEffect running...");  // Debug: Effect fires?
-  if (!mapContainer.current) {
-    console.error("Map container ref is null!");  // Debug: Ref attached?
-    return;
-  }
-
-  console.log("Mapbox token:", mapboxgl.accessToken);  // Debug: Token loaded?
-
-  if (!map.current) {
-    console.log("Initializing new map...");
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [siteLocation.lng, siteLocation.lat],
-      zoom: 12,
-    });
-
-    // Site marker (green)
-    const siteMarker = new mapboxgl.Marker({ color: "green" })
-      .setLngLat([siteLocation.lng, siteLocation.lat])
-      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-      .addTo(map.current);
-    console.log("Site marker added");  // Debug: Marker OK?
-
-    // Driver marker (blue) — updates when location changes
-    if (location) {
-      if (marker.current) marker.current.remove();
-      marker.current = new mapboxgl.Marker({ color: "blue" })
-        .setLngLat([location.lng, location.lat])
-        .addTo(map.current);
-      map.current.flyTo({ center: [location.lng, location.lat], zoom: 15 });
+    console.log("Map useEffect running...");
+    if (!mapContainer.current) {
+      console.error("Map container ref is null!");
+      return;
     }
 
-    return () => map.current?.remove();
-  }, [location]);
+    console.log("Mapbox token:", mapboxgl.accessToken);
 
+    if (!map.current) {
+      console.log("Initializing new map...");
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [siteLocation.lng, siteLocation.lat],
+        zoom: 12,
+      });
+
+    // Site marker (green)
+      const siteMarker = new mapboxgl.Marker({ color: "green" })
+        .setLngLat([siteLocation.lng, siteLocation.lat])
+        .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+        .addTo(map.current);
+      console.log("Site marker added");
+
+    // Driver marker (blue)
+      if (location) {
+        if (marker.current) marker.current.remove();
+        marker.current = new mapboxgl.Marker({ color: "blue" })
+          .setLngLat([location.lng, location.lat])
+          .addTo(map.current);
+        map.current.flyTo({ center: [location.lng, location.lat], zoom: 15 });
+        console.log("Driver marker added");
+      }
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        console.log("Map cleaned up");
+      }
+    };
+  }, [location]);   // ← THIS ) WAS MISSING — NOW FIXED
+  
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       {/* Header */}
