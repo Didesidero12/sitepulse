@@ -5,18 +5,8 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Ignore build artifacts (common false positives)
 [secrets.scan]
-  omit_paths = [
-    ".next/**",
-    ".netlify/**",
-    "dist/**",
-    "build/**",
-    ".cache/**"
-  ]
+  omit_paths = [".next/**", ".netlify/**", "dist/**", "build/**"]
 
-# Explicitly omit the Mapbox token (public, safe)
 [secrets.scan]
-  omit_values = [
-    "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"
-  ]
+  omit_values = ["pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"]
