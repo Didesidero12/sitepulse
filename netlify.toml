@@ -5,10 +5,7 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Ignore Mapbox public token — it's safe
+# Single secrets.scan block — TOML allows only one
 [secrets.scan]
   omit_values = ["pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"]
-
-# Ignore build folders
-[secrets.scan]
   omit_paths = [".next/**", ".netlify/**"]
