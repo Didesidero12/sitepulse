@@ -8,8 +8,8 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// FINAL TOKEN — WORKS EVERYWHERE
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
+// BULLETPROOF TOKEN — HARDCODED FOR TESTING (REMOVE AFTER CONFIRMING)
+mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
 export default function DriverView() {
   const { id } = useParams();
@@ -19,6 +19,7 @@ export default function DriverView() {
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [delivery] = useState({ material: "Doors from Italy", qty: "12 bifolds", needsForklift: true });
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
@@ -65,9 +66,13 @@ export default function DriverView() {
     return R * c;
   };
 
-  // MAP — BULLETPROOF
-  useEffect(() => {
+  // MAP INIT — BULLETPROOF WITH MANUAL BUTTON
+  const initMap = () => {
     if (!mapContainer.current) return;
+
+    if (map.current) {
+      map.current.remove();
+    }
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -89,7 +94,23 @@ export default function DriverView() {
       map.current.flyTo({ center: [location.lng, location.lat], zoom: 15 });
     }
 
-    return () => map.current?.remove();
+    map.current.on('load', () => console.log("Map loaded successfully"));
+  };
+
+  useEffect(() => {
+    // Delay map init to ensure DOM is ready
+    const timer = setTimeout(initMap, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (location && map.current) {
+      if (marker.current) marker.current.remove();
+      marker.current = new mapboxgl.Marker({ color: "blue" })
+        .setLngLat([location.lng, location.lat])
+        .addTo(map.current);
+      map.current.flyTo({ center: [location.lng, location.lat], zoom: 15 });
+    }
   }, [location]);
 
   return (
@@ -102,15 +123,21 @@ export default function DriverView() {
       <div className="p-6 space-y-6 flex-1">
         <div className="bg-gray-800 rounded-2xl p-8 text-center">
           <h2 className="text-3xl font-bold text-green-400 mb-4">DELIVERY</h2>
-          <p className="text-5xl font-bold">Doors from Italy</p>
-          <p className="text-3xl">12 bifolds</p>
-          <p className="text-red-400 text-3xl font-bold mt-4">FORKLIFT NEEDED</p>
+          <p className="text-5xl font-bold mb-2">{delivery.material}</p>
+          <p className="text-3xl mb-4">{delivery.qty}</p>
+          {delivery.needsForklift && <p className="text-red-400 text-3xl font-bold mt-4">FORKLIFT NEEDED</p>}
         </div>
 
-        {/* FINAL MAP CONTAINER — THIS WILL WORK */}
         <div className="w-full bg-gray-800 rounded-2xl overflow-hidden" style={{ height: '500px' }}>
           <div ref={mapContainer} className="w-full h-full" />
         </div>
+
+        <button
+          onClick={initMap}
+          className="w-full bg-blue-600 py-8 text-4xl font-bold rounded-3xl mb-4"
+        >
+          INIT MAP (Test Button)
+        </button>
 
         <button
           onClick={() => setTracking(!tracking)}
