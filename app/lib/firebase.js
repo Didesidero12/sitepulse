@@ -1,16 +1,15 @@
 // app/lib/firebase.js
 import { initializeApp } from "firebase/app";
-import { getFirestore, serverTimestamp } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDfZthCoqe3owZnKG8qnjLwan9IG2bxf70",
-  authDomain: "sitepulse-world.firebaseapp.com",
-  projectId: "sitepulse-world",
-  storageBucket: "sitepulse-world.firebasestorage.app",
-  messagingSenderId: "721123369540",
-  appId: "1:721123369540:web:a839a6617e3c38aa571211"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export { serverTimestamp };
