@@ -5,5 +5,5 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Disable secrets scanner — Firebase/Mapbox public keys are safe
+# Disable Netlify's secrets scanner — our Firebase/Mapbox keys are public
 SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
