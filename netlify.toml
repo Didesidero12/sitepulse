@@ -5,15 +5,5 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Tell Netlify this Mapbox token is NOT a secret
-[secrets]
-  ignore = [
-    ".next/**",
-    ".netlify/**"
-  ]
-
-# Explicitly whitelist the public Mapbox token (this is safe)
-[secrets.scan]
-  omit_values = [
-    "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"
-  ]
+# Override secrets scanner — Mapbox token is public and safe
+SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg"
