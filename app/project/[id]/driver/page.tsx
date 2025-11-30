@@ -116,9 +116,9 @@ export default function DriverView() {
         </div>
       </div>
 
-      {/* Map */}
-      <div className="flex-1 px-6 pb-6">
-        <div ref={mapContainer} className="h-full rounded-2xl bg-gray-800" />
+        {/* MAP — THIS WILL 100% WORK */}
+        <div className="w-full bg-gray-800 rounded-2xl overflow-hidden" style={{ height: '500px' }}>
+        <div ref={mapContainer} className="w-full h-full" />
       </div>
 
       {/* Action Buttons */}
