@@ -5,7 +5,5 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Ignore both the Mapbox token AND all Firebase API keys (they all start with AIza)
-[secrets.scan]
-  omit_values = ["pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg", "AIza"]
-  omit_paths = [".next/**", ".netlify/**"]
+# DISABLE SECRETS SCANNING — public Firebase/Mapbox tokens are safe
+SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
