@@ -93,7 +93,7 @@ export default function DriverView() {
           <p className="text-8xl font-black">{delivery?.eta}</p>
         </div>
 
-        <div id="map" className="h-64 rounded-2xl bg-gray-800"></div>
+        <div id="map" className="h-64 w-full rounded-2xl overflow-hidden bg-gray-800"></div>
 
         <button onClick={() => setTracking(!tracking)} className={`${tracking ? 'bg-red-600' : 'bg-green-600'} hover:opacity-90 p-8 text-4xl font-bold rounded-2xl w-full`}>
           {tracking ? "STOP TRACKING" : "START TRACKING →"}
