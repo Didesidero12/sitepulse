@@ -31,17 +31,17 @@ export default function MyProjects() {
               No projects yet. Create one or join with a Project ID.
             </p>
           ) : (
-            projects.map((p) => (
+            projects.map((project) => (  // Changed 'p' to 'project' for clarity
               <Link
-                key={p.id}
-                href={`/project/${p.id}`}
+                key={project.id}
+                href={`/project/${project.id}`}  // Use 'project.id'
                 className="block bg-gray-800 rounded-2xl p-8 hover:bg-gray-700 transition-all shadow-xl"
               >
-                <h2 className="text-4xl font-bold mb-4">{p.name || "Unnamed Project"}</h2>
-                <p className="text-2xl text-orange-400 mb-2">ID: {p.id}</p>
-                <p className="text-xl text-gray-400">GC PIN: {p.pin}</p>
+                <h2 className="text-4xl font-bold mb-4">{project.name || "Unnamed Project"}</h2>
+                <p className="text-2xl text-orange-400 mb-2">ID: {project.id}</p>
+                <p className="text-xl text-gray-400">GC PIN: {project.pin}</p>
                 <p className="mt-6 text-green-400 font-semibold">
-                  Status: {p.status === "open" ? "OPEN" : "CLOSED"}
+                  Status: {project.status === "open" ? "OPEN" : "CLOSED"}
                 </p>
               </Link>
             ))
@@ -56,7 +56,6 @@ export default function MyProjects() {
             + Create New Project
           </Link>
         </div>
-
       </div>
     </div>
   );
