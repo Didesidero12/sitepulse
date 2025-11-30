@@ -69,10 +69,18 @@ export default function DriverView() {
     return R * c;
   };
 
-  // Map Setup
+  // Map Setup with Debug
   useEffect(() => {
-    if (!mapContainer.current) return;
+  console.log("Map useEffect running...");  // Debug: Effect fires?
+  if (!mapContainer.current) {
+    console.error("Map container ref is null!");  // Debug: Ref attached?
+    return;
+  }
 
+  console.log("Mapbox token:", mapboxgl.accessToken);  // Debug: Token loaded?
+
+  if (!map.current) {
+    console.log("Initializing new map...");
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
@@ -81,10 +89,11 @@ export default function DriverView() {
     });
 
     // Site marker (green)
-    new mapboxgl.Marker({ color: "green" })
+    const siteMarker = new mapboxgl.Marker({ color: "green" })
       .setLngLat([siteLocation.lng, siteLocation.lat])
       .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
       .addTo(map.current);
+    console.log("Site marker added");  // Debug: Marker OK?
 
     // Driver marker (blue) — updates when location changes
     if (location) {
