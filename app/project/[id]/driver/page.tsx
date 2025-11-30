@@ -6,19 +6,22 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '@/app/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-// Hard-code Mapbox CDN — bypasses all bundling issues
+// CDN — proven to work
 const MAPBOX_CSS = "https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css";
 const MAPBOX_JS = "https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js";
 
 export default function DriverView() {
   const { id } = useParams();
   const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<any>(null);
+  const driverMarker = useRef<any>(null);
+
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Load Mapbox from CDN
+  // 1. Load Mapbox from CDN
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -36,36 +39,52 @@ export default function DriverView() {
     document.body.appendChild(script);
 
     return () => {
-      document.head.removeChild(link);
-      document.body.removeChild(script);
+      if (document.head.contains(link)) document.head.removeChild(link);
+      if (document.body.contains(script)) document.body.removeChild(script);
     };
   }, []);
 
+  // 2. Initialize map + green pin (once)
   const initMap = () => {
     if (!mapContainer.current || !window.mapboxgl) return;
 
-    // @ts-ignore
-    const map = new window.mapboxgl.Map({
+    map.current = new window.mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
       center: [siteLocation.lng, siteLocation.lat],
-      zoom: 12,
+      zoom: 14,
     });
 
+    // Green site pin
     new window.mapboxgl.Marker({ color: "green" })
       .setLngLat([siteLocation.lng, siteLocation.lat])
       .setPopup(new window.mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-      .addTo(map);
-
-    if (location) {
-      new window.mapboxgl.Marker({ color: "blue" })
-        .setLngLat([location.lng, location.lat])
-        .addTo(map);
-      map.flyTo({ center: [location.lng, location.lat], zoom: 15 });
-    }
+      .addTo(map.current);
   };
 
-  // GPS TRACKING
+  // 3. Update BLUE DRIVER DOT whenever location changes — THIS WAS MISSING
+  useEffect(() => {
+    if (!map.current || !location) return;
+
+    // Remove old marker
+    if (driverMarker.current) {
+      driverMarker.current.remove();
+    }
+
+    // Add new blue dot
+    driverMarker.current = new window.mapboxgl.Marker({ color: "blue" })
+      .setLngLat([location.lng, location.lat])
+      .addTo(map.current);
+
+    // Fly to driver
+    map.current.flyTo({
+      center: [location.lng, location.lat],
+      zoom: 16,
+      essential: true,
+    });
+  }, [location]);
+
+  // 4. GPS TRACKING
   useEffect(() => {
     if (!tracking) return;
 
@@ -73,17 +92,18 @@ export default function DriverView() {
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
+
         try {
           await updateDoc(doc(db, "projects", id as string), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
         } catch (err) {
-          console.error("Failed to update:", err);
+          console.error("Firestore update failed:", err);
         }
       },
-      (err) => console.error(err),
-      { enableHighAccuracy: true }
+      (err) => console.error("GPS error:", err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
@@ -104,11 +124,18 @@ export default function DriverView() {
           <p className="text-red-400 text-3xl font-bold mt-4">FORKLIFT NEEDED</p>
         </div>
 
-        <div ref={mapContainer} className="w-full h-96 rounded-2xl bg-gray-800" style={{ minHeight: "500px" }} />
+        {/* MAP — BULLETPROOF */}
+        <div
+          ref={mapContainer}
+          className="w-full rounded-2xl bg-gray-800"
+          style={{ height: "500px" }}
+        />
 
         <button
           onClick={() => setTracking(!tracking)}
-          className={`w-full py-12 text-5xl font-bold rounded-3xl ${tracking ? 'bg-red-600' : 'bg-green-600'}`}
+          className={`w-full py-12 text-5xl font-bold rounded-3xl transition ${
+            tracking ? "bg-red-600 hover:bg-red-500" : "bg-green-600 hover:bg-green-500"
+          }`}
         >
           {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
