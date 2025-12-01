@@ -29,9 +29,12 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-// GPS + Firestore update — FIXED NO CONFLICTS
+/ GPS TRACKING — ONE DELIVERY DOC FOREVER (NO MORE DUPLICATES)
   useEffect(() => {
     if (!tracking) return;
+
+    // Get or create delivery ID once
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -39,13 +42,13 @@ export default function DriverView() {
         setLocation(newLoc);
 
         if (deliveryId) {
-          // UPDATE EXISTING DELIVERY
-          await updateDoc(firestoreDoc(db, "deliveries", deliveryId), {
+          // UPDATE existing delivery
+          await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
         } else {
-          // CREATE NEW DELIVERY ON FIRST POSITION
+          // CREATE delivery ONCE
           const newDelivery = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -55,7 +58,8 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          localStorage.setItem(`deliveryId_${id}`, newDelivery.id);
+          deliveryId = newDelivery.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
         }
 
         checkGeofence(newLoc);
@@ -64,8 +68,12 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, id, deliveryId]);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      // Optional: clean up localStorage when stopping
+      // localStorage.removeItem(`deliveryId_${id}`);
+    };
+  }, [tracking, id]);
 
   const checkGeofence = (loc: { lat: number; lng: number }) => {
     const dist = getDistance(loc, siteLocation);
