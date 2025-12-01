@@ -2,7 +2,7 @@
 "use client";
 
 import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';  // ← THIS LINE FIXED
+import { useEffect, useRef, useState } from 'react';
 import { db } from '@/app/lib/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
@@ -11,11 +11,14 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
 export default function SuperWarRoom() {
-  const { id } = useParams();
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const params = useParams();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id; // ← FIXES THE BUILD ERROR
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<Map<string, mapboxgl.Marker>>(new Map());
+
+  const [deliveries, setDeliveries] = useState<any[]>([]);
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
