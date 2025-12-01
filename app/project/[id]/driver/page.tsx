@@ -13,11 +13,12 @@ mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZ
 
 export default function DriverView() {
   const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : params.id; // ← THIS FIXES THE BUILD ERROR
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
+  const trackingStarted = useRef(false);   // ← ADD THIS LINE HERE
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -68,31 +69,31 @@ export default function DriverView() {
     return R * c;
   };
 
-  // Map init + blue dot update
+  // MAP — STOPS THE FLYTO SPAM LOOP (Driver page ONLY
+  const trackingStarted = useRef(false); // ← add this line near your other refs
+
   useEffect(() => {
-    if (!mapContainer.current) return;
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [siteLocation.lng, siteLocation.lat],
-      zoom: 14,
-    });
-
-    new mapboxgl.Marker({ color: "green" })
-      .setLngLat([siteLocation.lng, siteLocation.lat])
-      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-      .addTo(map.current);
+    if (!mapContainer.current || !map.current) return;
 
     if (location) {
+      // Remove old blue dot
       if (marker.current) marker.current.remove();
+
+      // Add new blue dot
       marker.current = new mapboxgl.Marker({ color: "blue" })
         .setLngLat([location.lng, location.lat])
         .addTo(map.current);
-      map.current.flyTo({ center: [location.lng, location.lat], zoom: 16 });
-    }
 
-    return () => map.current?.remove();
+      // Fly to driver ONLY the very first time we get a location
+      if (!trackingStarted.current) {
+        map.current.flyTo({
+          center: [location.lng, location.lat],
+          zoom: 16,
+          essential: true,
+        });
+        trackingStarted.current = true;
+      }
+    }
   }, [location]);
 
   return (
