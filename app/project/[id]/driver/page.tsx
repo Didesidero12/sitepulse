@@ -4,7 +4,7 @@
 import { useParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/app/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -19,11 +19,11 @@ export default function DriverView() {
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [delivery, setDelivery] = useState({ material: "Doors from Italy", qty: "12 bifolds", needsForklift: true });
+  const [deliveryId] = useState<string | null>(localStorage.getItem(`deliveryId_${id}`)); // Persist delivery ID
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS + Firestore update + geofencing
+  // GPS tracking — UPDATE EXISTING DOC, NO DUPLICATES
   useEffect(() => {
     if (!tracking) return;
 
@@ -32,25 +32,34 @@ export default function DriverView() {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        // Add delivery to Firestore for super to see
-        await addDoc(collection(db, "deliveries"), {
-          projectId: id,
-          material: delivery.material,
-          qty: delivery.qty,
-          needsForklift: delivery.needsForklift,
-          driverLocation: newLoc,
-          status: "en_route",
-          timestamp: serverTimestamp(),
-        });
+        if (deliveryId) {
+          // UPDATE EXISTING DELIVERY DOC
+          await updateDoc(doc(db, "deliveries", deliveryId), {
+            driverLocation: newLoc,
+            lastUpdate: serverTimestamp(),
+          });
+        } else {
+          // CREATE NEW DELIVERY DOC ON FIRST POSITION
+          const newDelivery = await addDoc(collection(db, "deliveries"), {
+            projectId: id,
+            material: "Doors from Italy",
+            qty: "12 bifolds",
+            needsForklift: true,
+            driverLocation: newLoc,
+            status: "en_route",
+            timestamp: serverTimestamp(),
+          });
+          localStorage.setItem(`deliveryId_${id}`, newDelivery.id);
+        }
 
         checkGeofence(newLoc);
       },
-      (err) => console.error(err),
+      (err) => console.error("GPS error:", err),
       { enableHighAccuracy: true }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking]);
+  }, [tracking, id, deliveryId]);
 
   const checkGeofence = (loc: { lat: number; lng: number }) => {
     const dist = getDistance(loc, siteLocation);
@@ -69,7 +78,7 @@ export default function DriverView() {
     return R * c;
   };
 
-  // Map init + markers
+  // Map init — ONCE ONLY, NO RE-INIT
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -80,20 +89,38 @@ export default function DriverView() {
       zoom: 14,
     });
 
+    // Green site pin
     new mapboxgl.Marker({ color: "green" })
       .setLngLat([siteLocation.lng, siteLocation.lat])
       .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
       .addTo(map.current);
 
+    // Initial driver marker
     if (location) {
-      if (marker.current) marker.current.remove();
       marker.current = new mapboxgl.Marker({ color: "blue" })
         .setLngLat([location.lng, location.lat])
         .addTo(map.current);
-      map.current.flyTo({ center: [location.lng, location.lat], zoom: 16 });
     }
 
     return () => map.current?.remove();
+  }, []); // Empty deps — init once only
+
+  // Update driver marker on location change — NO RE-INIT
+  useEffect(() => {
+    if (!map.current || !location) return;
+
+    if (marker.current) marker.current.remove();
+
+    marker.current = new mapboxgl.Marker({ color: "blue" })
+      .setLngLat([location.lng, location.lat])
+      .addTo(map.current);
+
+    // Smooth flyTo — no spam
+    map.current.easeTo({
+      center: [location.lng, location.lat],
+      zoom: 16,
+      duration: 1000,
+    });
   }, [location]);
 
   return (
