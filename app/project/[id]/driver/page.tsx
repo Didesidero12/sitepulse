@@ -136,7 +136,7 @@ export default function DriverView() {
           {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
 
-                 {/* BUTTONS — PERFECT JSX, NO DUPLICATES */}
+         {/* BUTTONS — PERFECT JSX, NO DUPLICATES */}
         <div className="space-y-6">
           <button
             onClick={() => setTracking(!tracking)}
@@ -147,6 +147,7 @@ export default function DriverView() {
             {tracking ? "STOP TRACKING" : "START TRACKING"}
           </button>
 
+          {/* I'VE ARRIVED BUTTON — FINAL KILL SHOT */}
           {tracking && (
             <button
               onClick={async () => {
