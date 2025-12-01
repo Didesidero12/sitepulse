@@ -2,7 +2,7 @@
 "use client";
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';  // ← THIS LINE FIXED
 import { db } from '@/app/lib/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
