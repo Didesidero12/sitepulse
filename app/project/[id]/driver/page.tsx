@@ -24,22 +24,20 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
- // GPS TRACKING — 100% BULLETPROOF (NO MORE 4× TRUCKS)
+// GPS + Firestore update + geofencing — FIXED NO DUPLICATES
   useEffect(() => {
     if (!tracking) return;
 
-    let deliveryId: string | null = null;
-    let mounted = true;                     // ← THIS LINE KILLS THE DOUBLE-MOUNT BUG
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
-        if (!mounted) return;               // ← ignore duplicate mount calls
-
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
         if (!deliveryId) {
-          const docRef = await addDoc(collection(db, "deliveries"), {
+          // CREATE DOC ONCE
+          const newDelivery = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
             qty: "12 bifolds",
@@ -48,8 +46,10 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          deliveryId = docRef.id;
+          deliveryId = newDelivery.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
         } else {
+          // UPDATE EXISTING DOC
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
@@ -62,10 +62,7 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => {
-      mounted = false;                     // ← cleanup flag
-      navigator.geolocation.clearWatch(watchId);
-    };
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, id]);
 
   const checkGeofence = (loc: { lat: number; lng: number }) => {
