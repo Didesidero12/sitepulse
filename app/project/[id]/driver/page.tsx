@@ -18,7 +18,7 @@ export default function DriverView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
-  const trackingStarted = useRef(false);   // ← ADD THIS LINE HERE
+  const trackingStarted = useRef(false);   // ← ONLY ONE OF THESE — DELETE ANY OTHER
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -70,8 +70,6 @@ export default function DriverView() {
   };
 
   // MAP — STOPS THE FLYTO SPAM LOOP (Driver page ONLY
-  const trackingStarted = useRef(false); // ← add this line near your other refs
-
   useEffect(() => {
     if (!mapContainer.current || !map.current) return;
 
