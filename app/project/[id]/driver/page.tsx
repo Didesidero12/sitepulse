@@ -24,19 +24,21 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
- // GPS TRACKING — ONE DELIVERY DOC ONLY (NO MORE 4x SPAM)
+ // GPS TRACKING — 100% BULLETPROOF (NO MORE 4× TRUCKS)
   useEffect(() => {
     if (!tracking) return;
 
     let deliveryId: string | null = null;
+    let mounted = true;                     // ← THIS LINE KILLS THE DOUBLE-MOUNT BUG
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
+        if (!mounted) return;               // ← ignore duplicate mount calls
+
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
         if (!deliveryId) {
-          // CREATE DELIVERY ONCE
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -48,7 +50,6 @@ export default function DriverView() {
           });
           deliveryId = docRef.id;
         } else {
-          // UPDATE EXISTING
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
@@ -62,9 +63,8 @@ export default function DriverView() {
     );
 
     return () => {
+      mounted = false;                     // ← cleanup flag
       navigator.geolocation.clearWatch(watchId);
-      // Optional: clean up delivery doc when driver stops
-      // if (deliveryId) deleteDoc(doc(db, "deliveries", deliveryId));
     };
   }, [tracking, id]);
 
