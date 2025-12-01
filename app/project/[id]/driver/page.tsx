@@ -125,7 +125,7 @@ export default function DriverView() {
           {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
 
-        {/* I'VE ARRIVED — FINAL KILL SHOT */}
+                {/* I'VE ARRIVED — FINAL KILL SHOT */}
         {tracking && (
           <button
             onClick={async () => {
@@ -145,7 +145,3 @@ export default function DriverView() {
             I'VE ARRIVED
           </button>
         )}
-      </div>
-    </div>
-  );
-}
