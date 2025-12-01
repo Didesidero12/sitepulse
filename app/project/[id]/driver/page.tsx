@@ -125,19 +125,9 @@ export default function DriverView() {
           {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
 
-                {/* I'VE ARRIVED — FINAL KILL SHOT */}
-        {tracking && (
-                  <button
-          onClick={() => setTracking(!tracking)}
-          className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
-            tracking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
-          }`}
-        >
-          {tracking ? "STOP TRACKING" : "START TRACKING"}
-        </button>
-
-         {/* BUTTONS — PERFECT JSX, NO DUPLICATES */}
+        {/* BUTTONS — CLEAN, PERFECT, NO DUPLICATES */}
         <div className="space-y-6">
+          {/* START / STOP TRACKING BUTTON */}
           <button
             onClick={() => setTracking(!tracking)}
             className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
@@ -147,7 +137,7 @@ export default function DriverView() {
             {tracking ? "STOP TRACKING" : "START TRACKING"}
           </button>
 
-          {/* I'VE ARRIVED BUTTON — FINAL KILL SHOT */}
+          {/* I'VE ARRIVED BUTTON — ONLY SHOWS WHEN TRACKING */}
           {tracking && (
             <button
               onClick={async () => {
