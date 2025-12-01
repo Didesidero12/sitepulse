@@ -7,7 +7,7 @@ import { db } from '@/app/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc as firestoreDoc, serverTimestamp } from 'firebase/firestore';
 
 // Hard-coded token — guaranteed to work
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
@@ -24,7 +24,7 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS tracking — UPDATE EXISTING DOC, NO DUPLICATES
+// GPS + Firestore update — FIXED NO CONFLICTS
   useEffect(() => {
     if (!tracking) return;
 
@@ -34,13 +34,13 @@ export default function DriverView() {
         setLocation(newLoc);
 
         if (deliveryId) {
-          // UPDATE EXISTING DELIVERY DOC
-          await updateDoc(doc(db, "deliveries", deliveryId), {
+          // UPDATE EXISTING DELIVERY
+          await updateDoc(firestoreDoc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
         } else {
-          // CREATE NEW DELIVERY DOC ON FIRST POSITION
+          // CREATE NEW DELIVERY ON FIRST POSITION
           const newDelivery = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
