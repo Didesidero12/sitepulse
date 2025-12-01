@@ -24,33 +24,32 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS + Firestore update + geofencing
+ // GPS TRACKING — ONE DELIVERY DOC ONLY (NO MORE 4x SPAM)
   useEffect(() => {
     if (!tracking) return;
+
+    let deliveryId: string | null = null;
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        let currentDeliveryId = deliveryId;
-
-        if (!currentDeliveryId) {
-          // CREATE NEW DELIVERY ON FIRST POSITION
-          const newDelivery = await addDoc(collection(db, "deliveries"), {
+        if (!deliveryId) {
+          // CREATE DELIVERY ONCE
+          const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
-            material: delivery.material,
-            qty: delivery.qty,
-            needsForklift: delivery.needsForklift,
+            material: "Doors from Italy",
+            qty: "12 bifolds",
+            needsForklift: true,
             driverLocation: newLoc,
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          currentDeliveryId = newDelivery.id;
-          setDeliveryId(currentDeliveryId);
+          deliveryId = docRef.id;
         } else {
-          // UPDATE EXISTING DELIVERY
-          await updateDoc(doc(db, "deliveries", currentDeliveryId), {
+          // UPDATE EXISTING
+          await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
@@ -58,12 +57,16 @@ export default function DriverView() {
 
         checkGeofence(newLoc);
       },
-      (err) => console.error("GPS error:", err),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      (err) => console.error(err),
+      { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, id, deliveryId, delivery]);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      // Optional: clean up delivery doc when driver stops
+      // if (deliveryId) deleteDoc(doc(db, "deliveries", deliveryId));
+    };
+  }, [tracking, id]);
 
   const checkGeofence = (loc: { lat: number; lng: number }) => {
     const dist = getDistance(loc, siteLocation);
