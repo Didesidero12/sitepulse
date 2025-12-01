@@ -24,25 +24,22 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-     // GPS TRACKING — ZERO DUPLICATES, FOREVER
+      // GPS + Firestore update + geofencing — FIXED NO DUPLICATES
   useEffect(() => {
     if (!tracking) return;
+
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
+    let firstPing = true;  // Flag to create only on first ping
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        // Use a stable delivery ID for this session
-        const sessionId = localStorage.getItem(`session_${id}`) || Date.now().toString();
-        localStorage.setItem(`session_${id}`, sessionId);
-
-        const deliveryId = localStorage.getItem(`deliveryId_${sessionId}`) || null;
-
-        if (!deliveryId) {
+        if (!deliveryId && firstPing) {
+          firstPing = false;  // Create only on FIRST ping
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
-            sessionId: sessionId,
             material: "Doors from Italy",
             qty: "12 bifolds",
             needsForklift: true,
@@ -50,8 +47,9 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          localStorage.setItem(`deliveryId_${sessionId}`, docRef.id);
-        } else {
+          deliveryId = docRef.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
+        } else if (deliveryId) {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
@@ -60,8 +58,8 @@ export default function DriverView() {
 
         checkGeofence(newLoc);
       },
-      (err) => console.error(err),
-      { enableHighAccuracy: true }
+      (err) => console.error("GPS error:", err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
