@@ -21,6 +21,10 @@ export default function DriverView() {
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [delivery, setDelivery] = useState({ material: "Doors from Italy", qty: "12 bifolds", needsForklift: true });
+  const [deliveryId, setDeliveryId] = useState<string | null>(null);
+
+  const siteLocation = { lat: 45.5231, lng: -122.6765 };   // ← THIS LINE WAS MISSING
 
       // GPS + Firestore update + geofencing — FIXED NO DUPLICATES
   useEffect(() => {
