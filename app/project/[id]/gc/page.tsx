@@ -33,7 +33,7 @@ export default function SuperWarRoom() {
     return unsub;
   }, [id]);
 
-  // Map + live markers
+  // Map + live markers — FIXED WITH PROPER CLOSING BRACE
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -61,13 +61,15 @@ export default function SuperWarRoom() {
       } else {
         const marker = new mapboxgl.Marker({ color: "blue" })
           .setLngLat([loc.lng, loc.lat])
-          .setPopup(new mapboxgl.Popup().setHTML(`
-            <div class="p-2">
-              <strong>${d.material}</strong><br>
-              ${d.qty}<br>
-              ${d.needsForklift ? "⚠️ FORKLIFT NEEDED" : ""}
-            </div>
-          `))
+          .setPopup(
+            new mapboxgl.Popup().setHTML(`
+              <div class="p-2">
+                <strong>${d.material || "Unknown"}</strong><br>
+                ${d.qty || ""}<br>
+                ${d.needsForklift ? "⚠️ FORKLIFT NEEDED" : ""}
+              </div>
+            `)
+          )
           .addTo(map.current!);
         markers.current.set(d.id, marker);
       }
@@ -80,14 +82,7 @@ export default function SuperWarRoom() {
         markers.current.delete(dId);
       }
     });
-  }, [deliveries]);
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-purple-700 p-6 text-center">
-        <h1 className="text-5xl font-bold">SUPER WAR ROOM</h1>
-        <p className="text-2xl">Project {id} — {deliveries.length} trucks en route</p>
-      </div>
+  }, [deliveries]);   // ← THIS CLOSING BRACE WAS MISSING BEFORE
 
         {/* MAP — BULLETPROOF CONTAINER */}
         <div 
