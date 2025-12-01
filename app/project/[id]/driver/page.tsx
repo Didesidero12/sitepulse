@@ -116,35 +116,35 @@ export default function DriverView() {
     map.current.flyTo({ center: [location.lng, location.lat], zoom: 16 });
   }, [location]);
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-green-600 p-6 text-center">
-        <h1 className="text-4xl font-bold">DRIVER MODE</h1>
-        <p className="text-2xl opacity-90">Project {id}</p>
-      </div>
-
-      <div className="p-6 space-y-6 flex-1">
-        <div className="bg-gray-800 rounded-2xl p-8 text-center">
-          <h2 className="text-3xl font-bold text-green-400 mb-4">DELIVERY</h2>
-          <p className="text-5xl font-bold mb-2">{delivery.material}</p>
-          <p className="text-3xl mb-4">{delivery.qty}</p>
-          {delivery.needsForklift && <p className="text-red-400 text-3xl font-bold">FORKLIFT NEEDED</p>}
-        </div>
-
-        <div ref={mapContainer} className="w-full h-96 rounded-2xl bg-gray-800" style={{ minHeight: "500px" }} />
-
-        <button
+         <button
           onClick={() => setTracking(!tracking)}
-          className={`w-full py-12 text-5xl font-bold rounded-3xl transition ${
-            tracking ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
+          className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
+            tracking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
           }`}
         >
           {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
 
-        <button className="w-full bg-blue-600 py-12 text-5xl font-bold rounded-3xl">
-          I'VE ARRIVED
-        </button>
+        {/* I'VE ARRIVED — FINAL KILL SHOT */}
+        {tracking && (
+          <button
+            onClick={async () => {
+              const currentId = localStorage.getItem(`deliveryId_${id}`);
+              if (currentId) {
+                await updateDoc(doc(db, "deliveries", currentId), {
+                  status: "arrived",
+                  arrivedAt: serverTimestamp(),
+                });
+                localStorage.removeItem(`deliveryId_${id}`);
+              }
+              setTracking(false);
+              alert("Arrival confirmed — thanks, driver!");
+            }}
+            className="w-full py-16 text-6xl font-bold bg-yellow-500 hover:bg-yellow-600 rounded-3xl transition-all"
+          >
+            I'VE ARRIVED
+          </button>
+        )}
       </div>
     </div>
   );
