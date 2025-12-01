@@ -24,19 +24,21 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-// GPS + Firestore update + geofencing — FIXED NO DUPLICATES
+  // GPS + Firestore update + geofencing — FIXED NO DUPLICATES
   useEffect(() => {
     if (!tracking) return;
 
     let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
+    let created = false;  // Flag to create doc only once
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        if (!deliveryId) {
-          // CREATE DOC ONCE
+        if (!deliveryId && !created) {
+          // CREATE DOC ONLY ONCE
+          created = true;  // Flag it as created
           const newDelivery = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -48,8 +50,8 @@ export default function DriverView() {
           });
           deliveryId = newDelivery.id;
           localStorage.setItem(`deliveryId_${id}`, deliveryId);
-        } else {
-          // UPDATE EXISTING DOC
+        } else if (deliveryId) {
+          // UPDATE EXISTING
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
@@ -58,8 +60,8 @@ export default function DriverView() {
 
         checkGeofence(newLoc);
       },
-      (err) => console.error(err),
-      { enableHighAccuracy: true }
+      (err) => console.error("GPS error:", err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
