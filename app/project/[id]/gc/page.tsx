@@ -4,11 +4,10 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '@/app/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Hard-coded token — guaranteed to bind client-side
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
 export default function SuperWarRoom() {
@@ -20,14 +19,22 @@ export default function SuperWarRoom() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Realtime deliveries
+  // Realtime deliveries — FILTERED TO THIS PROJECT ONLY
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "deliveries"), (snap) => {
+    const q = query(
+      collection(db, "deliveries"),
+      where("projectId", "==", id),
+      where("status", "==", "en_route")
+    );
+    const unsub = onSnapshot(q, (snap) => {
       const list: any[] = [];
       snap.forEach((doc) => {
         const data = doc.data();
-        if (data.projectId === id && data.status === "en_route" && data.driverLocation) {
-          list.push({ id: doc.id, ...data });
+        if (data.driverLocation) {
+          const etaMin = data.driverLocation
+            ? Math.round(getDistance(data.driverLocation, siteLocation) / 0.833) // ~50 mph avg
+            : null;
+          list.push({ id: doc.id, etaMin, ...data });
         }
       });
       setDeliveries(list);
@@ -35,28 +42,38 @@ export default function SuperWarRoom() {
     return unsub;
   }, [id]);
 
-  // Map init — BULLETPROOF TIMING
+  const getDistance = (loc1: any, loc2: any) => {
+    const R = 3958.8;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(loc2.lat - loc1.lat);
+    const dLon = toRad(loc2.lng - loc1.lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(loc1.lat)) * Math.cos(toRad(loc2.lat)) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Map init — BULLETPROOF
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Delay init to ensure DOM is ready
+    // Delay to ensure DOM ready
     const timer = setTimeout(() => {
-      if (!map.current) {
-        map.current = new mapboxgl.Map({
-          container: mapContainer.current!,
-          style: "mapbox://styles/mapbox/streets-v12",
-          center: [siteLocation.lng, siteLocation.lat],
-          zoom: 14,
-        });
+      if (map.current) return;
 
-        new mapboxgl.Marker({ color: "green" })
-          .setLngLat([siteLocation.lng, siteLocation.lat])
-          .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-          .addTo(map.current);
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current!,
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [siteLocation.lng, siteLocation.lat],
+        zoom: 14,
+      });
 
-        // Initial markers
-        deliveries.forEach((d) => addMarker(d));
-      }
+      new mapboxgl.Marker({ color: "green" })
+        .setLngLat([siteLocation.lng, siteLocation.lat])
+        .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+        .addTo(map.current);
+
+      // Initial markers
+      deliveries.forEach((d) => addMarker(d));
     }, 100);
 
     return () => clearTimeout(timer);
@@ -81,16 +98,21 @@ export default function SuperWarRoom() {
     const loc = d.driverLocation;
     if (!loc) return;
 
+    const color = d.etaMin > 30 ? "red" : d.etaMin > 0 ? "yellow" : "green";
+
     if (markers.current.has(d.id)) {
       markers.current.get(d.id)!.setLngLat([loc.lng, loc.lat]);
     } else {
-      const marker = new mapboxgl.Marker({ color: "blue" })
+      const marker = new mapboxgl.Marker({ color })
         .setLngLat([loc.lng, loc.lat])
         .setPopup(
           new mapboxgl.Popup().setHTML(`
             <div class="p-2 font-bold">
               <div>${d.material} • ${d.qty}</div>
-              ${d.needsForklift ? "⚠️ FORKLIFT NEEDED" : ""}
+              ${d.needsForklift ? "FORKLIFT NEEDED" : ""}
+              <div class="${color}-500">
+                ETA: ${d.etaMin > 30 ? `${d.etaMin} min` : d.etaMin > 0 ? `${d.etaMin} min` : "ON SITE"}
+              </div>
             </div>
           `)
         )
@@ -128,7 +150,7 @@ export default function SuperWarRoom() {
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold text-green-400">
-                    {d.eta || "Calculating..."}
+                    {d.etaMin === null ? "—" : d.etaMin <= 0 ? "ON SITE" : `${d.etaMin} min`}
                   </div>
                 </div>
               </div>
