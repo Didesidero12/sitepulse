@@ -29,7 +29,7 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-/ GPS TRACKING — ONE DELIVERY DOC FOREVER (NO MORE DUPLICATES)
+// GPS TRACKING — ONE DELIVERY DOC FOREVER (NO MORE DUPLICATES)
   useEffect(() => {
     if (!tracking) return;
 
