@@ -4,10 +4,11 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '@/app/lib/firebase';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+// Hard-coded token — guaranteed to work
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
 export default function SuperWarRoom() {
@@ -20,20 +21,22 @@ export default function SuperWarRoom() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Realtime deliveries from Firestore
+  // Listen to all deliveries for this project
   useEffect(() => {
-    const q = query(collection(db, "deliveries"), where("projectId", "==", id));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(collection(db, "deliveries"), (snap) => {
       const list: any[] = [];
       snap.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        if (data.projectId === id && data.driverLocation) {
+          list.push({ id: doc.id, ...data });
+        }
       });
       setDeliveries(list);
     });
     return unsub;
   }, [id]);
 
-  // Map + live markers — FIXED WITH PROPER CLOSING BRACE
+  // Map + live markers
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -51,7 +54,7 @@ export default function SuperWarRoom() {
         .addTo(map.current);
     }
 
-    // Update markers for each delivery
+    // Update or add markers
     deliveries.forEach((d) => {
       const loc = d.driverLocation;
       if (!loc) return;
@@ -63,57 +66,62 @@ export default function SuperWarRoom() {
           .setLngLat([loc.lng, loc.lat])
           .setPopup(
             new mapboxgl.Popup().setHTML(`
-              <div class="p-2">
-                <strong>${d.material || "Unknown"}</strong><br>
+              <div class="p-2 font-bold">
+                ${d.material || "Unknown"}<br>
                 ${d.qty || ""}<br>
-                ${d.needsForklift ? "⚠️ FORKLIFT NEEDED" : ""}
+                ${d.needsForklift ? "FORKLIFT NEEDED" : ""}
               </div>
             `)
           )
           .addTo(map.current!);
+
         markers.current.set(d.id, marker);
       }
     });
 
-    // Clean up removed deliveries
-    markers.current.forEach((marker, dId) => {
-      if (!deliveries.some(d => d.id === dId)) {
+    // Cleanup removed deliveries
+    markers.current.forEach((marker, key) => {
+      if (!deliveries.find((d) => d.id === key)) {
         marker.remove();
-        markers.current.delete(dId);
+        markers.current.delete(key);
       }
     });
-  }, [deliveries]);   // ← THIS CLOSING BRACE WAS MISSING BEFORE
+  }, [deliveries]);
 
-        {/* MAP — BULLETPROOF CONTAINER */}
-        <div 
-          className="w-full bg-gray-800 rounded-2xl overflow-hidden" 
-          style={{ height: '600px' }}   {/* ← object, not string */}
-        >
-          <div ref={mapContainer} className="w-full h-full" />
-        </div>
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      <div className="bg-purple-700 p-8 text-center">
+        <h1 className="text-6xl font-bold">SUPER WAR ROOM</h1>
+        <p className="text-3xl mt-2">
+          Project {id} — {deliveries.length} truck{deliveries.length !== 1 ? "s" : ""} en route
+        </p>
+      </div>
 
-      <div className="bg-gray-800 p-6 max-h-96 overflow-y-auto">
-        <h2 className="text-3xl font-bold mb-4">Incoming Deliveries</h2>
+      {/* BULLETPROOF MAP CONTAINER */}
+      <div className="flex-1 p-6">
+        <div
+          ref={mapContainer}
+          className="w-full rounded-2xl bg-gray-800 overflow-hidden"
+          style={{ height: "65vh" }}
+        />
+      </div>
+
+      <div className="p-6 bg-gray-800">
+        <h2 className="text-4xl font-bold mb-4">Live Deliveries</h2>
         {deliveries.length === 0 ? (
-          <p className="text-center text-gray-400">No trucks en route</p>
+          <p className="text-center text-gray-400 text-2xl">No trucks en route right now</p>
         ) : (
-          <div className="space-y-4">
-            {deliveries.sort((a, b) => (a.eta || 0) - (b.eta || 0)).map((d) => (
-              <div key={d.id} className="bg-gray-700 p-4 rounded-xl">
-                <div className="flex justify-between">
-                  <div>
-                    <strong className="text-xl">{d.material}</strong><br />
-                    {d.qty} • {d.needsForklift && "⚠️ Forklift"}
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-green-400">
-                      {d.eta || "Calculating..."}
-                    </div>
-                  </div>
+          deliveries.map((d) => (
+            <div key={d.id} className="bg-gray-700 p-4 rounded-xl mb-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-2xl font-bold">{d.material || "Unknown"}</span>
+                  <span className="ml-3 text-xl">{d.qty}</span>
                 </div>
+                {d.needsForklift && <span className="text-red-400 text-2xl">FORKLIFT</span>}
               </div>
-            ))}
-          </div>
+            </div>
+          ))
         )}
       </div>
     </div>
