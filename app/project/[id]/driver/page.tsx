@@ -24,27 +24,25 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-   // GPS TRACKING — AUTO-CREATES NEW DELIVERY IF OLD ONE WAS DELETED
+     // GPS TRACKING — ZERO DUPLICATES, FOREVER
   useEffect(() => {
     if (!tracking) return;
-
-    // Clear any dead delivery ID from previous tests
-    const oldId = localStorage.getItem(`deliveryId_${id}`);
-    if (oldId) {
-      localStorage.removeItem(`deliveryId_${id}`);
-    }
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        let currentDeliveryId = localStorage.getItem(`deliveryId_${id}`);
+        // Use a stable delivery ID for this session
+        const sessionId = localStorage.getItem(`session_${id}`) || Date.now().toString();
+        localStorage.setItem(`session_${id}`, sessionId);
 
-        if (!currentDeliveryId) {
-          // CREATE NEW DELIVERY
+        const deliveryId = localStorage.getItem(`deliveryId_${sessionId}`) || null;
+
+        if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
+            sessionId: sessionId,
             material: "Doors from Italy",
             qty: "12 bifolds",
             needsForklift: true,
@@ -52,11 +50,9 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          currentDeliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, currentDeliveryId);
+          localStorage.setItem(`deliveryId_${sessionId}`, docRef.id);
         } else {
-          // UPDATE EXISTING
-          await updateDoc(doc(db, "deliveries", currentDeliveryId), {
+          await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
