@@ -4,28 +4,26 @@
 import { useParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/app/lib/firebase';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Hard-coded token for guaranteed map load
+// Hard-coded token — guaranteed to work
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
 export default function DriverView() {
-  const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : params.id;
-
+  const { id } = useParams();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
-  const trackingStarted = useRef(false);   // ← ONLY ONE OF THESE — DELETE ANY OTHER
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [delivery, setDelivery] = useState({ material: "Doors from Italy", qty: "12 bifolds", needsForklift: true });
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS + Realtime + Geofencing
+  // GPS + Firestore update + geofencing
   useEffect(() => {
     if (!tracking) return;
 
@@ -34,23 +32,25 @@ export default function DriverView() {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        try {
-          await updateDoc(doc(db, "projects", id), {
-            driverLocation: newLoc,
-            lastUpdate: serverTimestamp(),
-          });
-        } catch (err) {
-          console.error("Firestore update failed:", err);
-        }
+        // Add delivery to Firestore for super to see
+        await addDoc(collection(db, "deliveries"), {
+          projectId: id,
+          material: delivery.material,
+          qty: delivery.qty,
+          needsForklift: delivery.needsForklift,
+          driverLocation: newLoc,
+          status: "en_route",
+          timestamp: serverTimestamp(),
+        });
 
         checkGeofence(newLoc);
       },
-      (err) => console.error("GPS error:", err),
+      (err) => console.error(err),
       { enableHighAccuracy: true }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, id]);
+  }, [tracking]);
 
   const checkGeofence = (loc: { lat: number; lng: number }) => {
     const dist = getDistance(loc, siteLocation);
@@ -69,43 +69,45 @@ export default function DriverView() {
     return R * c;
   };
 
-  // MAP — STOPS THE FLYTO SPAM LOOP (Driver page ONLY
+  // Map init + markers
   useEffect(() => {
-    if (!mapContainer.current || !map.current) return;
+    if (!mapContainer.current) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [siteLocation.lng, siteLocation.lat],
+      zoom: 14,
+    });
+
+    new mapboxgl.Marker({ color: "green" })
+      .setLngLat([siteLocation.lng, siteLocation.lat])
+      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+      .addTo(map.current);
 
     if (location) {
-      // Remove old blue dot
       if (marker.current) marker.current.remove();
-
-      // Add new blue dot
       marker.current = new mapboxgl.Marker({ color: "blue" })
         .setLngLat([location.lng, location.lat])
         .addTo(map.current);
-
-      // Fly to driver ONLY the very first time we get a location
-      if (!trackingStarted.current) {
-        map.current.flyTo({
-          center: [location.lng, location.lat],
-          zoom: 16,
-          essential: true,
-        });
-        trackingStarted.current = true;
-      }
+      map.current.flyTo({ center: [location.lng, location.lat], zoom: 16 });
     }
+
+    return () => map.current?.remove();
   }, [location]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="bg-green-600 p-6 text-center">
-        <h1 className="text-6xl font-bold">DRIVER MODE</h1>
-        <p className="text-3xl opacity-90">Project {id}</p>
+        <h1 className="text-4xl font-bold">DRIVER MODE</h1>
+        <p className="text-2xl opacity-90">Project {id}</p>
       </div>
 
       <div className="flex-1 p-6">
         <div
           ref={mapContainer}
-          className="w-full h-full rounded-2xl bg-gray-800"
-          style={{ minHeight: "60vh" }}
+          className="w-full rounded-2xl bg-gray-800 overflow-hidden"
+          style={{ height: "65vh" }}
         />
       </div>
 
