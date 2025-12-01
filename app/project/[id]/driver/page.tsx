@@ -127,6 +127,17 @@ export default function DriverView() {
 
                 {/* I'VE ARRIVED — FINAL KILL SHOT */}
         {tracking && (
+                  <button
+          onClick={() => setTracking(!tracking)}
+          className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
+            tracking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {tracking ? "STOP TRACKING" : "START TRACKING"}
+        </button>
+
+        {/* I'VE ARRIVED — FINAL KILL SHOT */}
+        {tracking && (
           <button
             onClick={async () => {
               const currentId = localStorage.getItem(`deliveryId_${id}`);
@@ -145,3 +156,7 @@ export default function DriverView() {
             I'VE ARRIVED
           </button>
         )}
+      </div>
+    </div>
+  );
+}
