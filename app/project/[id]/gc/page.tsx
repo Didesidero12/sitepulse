@@ -92,7 +92,7 @@ export default function SuperWarRoom() {
         {/* MAP — BULLETPROOF CONTAINER */}
         <div 
           className="w-full bg-gray-800 rounded-2xl overflow-hidden" 
-          style="height: 600px"
+          style={{ height: '600px' }}   {/* ← object, not string */}
         >
           <div ref={mapContainer} className="w-full h-full" />
         </div>
