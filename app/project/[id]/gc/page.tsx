@@ -89,9 +89,13 @@ export default function SuperWarRoom() {
         <p className="text-2xl">Project {id} — {deliveries.length} trucks en route</p>
       </div>
 
-      <div className="flex-1 relative">
-        <div ref={mapContainer} className="absolute inset-0" />
-      </div>
+        {/* MAP — BULLETPROOF CONTAINER */}
+        <div 
+          className="w-full bg-gray-800 rounded-2xl overflow-hidden" 
+          style="height: 600px"
+        >
+          <div ref={mapContainer} className="w-full h-full" />
+        </div>
 
       <div className="bg-gray-800 p-6 max-h-96 overflow-y-auto">
         <h2 className="text-3xl font-bold mb-4">Incoming Deliveries</h2>
