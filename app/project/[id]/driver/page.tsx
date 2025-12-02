@@ -39,7 +39,8 @@ export default function DriverView() {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        if (!deliveryId) {
+        // FINAL ANTI-DUPLICATE GUARD — ONLY CREATE ONCE
+        if (!deliveryId && !localStorage.getItem(`deliveryId_${id}`)) {
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -49,10 +50,11 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
-        } else {
-          await updateDoc(doc(db, "deliveries", deliveryId), {
+          localStorage.setItem(`deliveryId_${id}`, docRef.id);
+          setDeliveryId(docRef.id);
+        } else if (deliveryId || localStorage.getItem(`deliveryId_${id}`)) {
+          const idToUse = deliveryId || localStorage.getItem(`deliveryId_${id}`);
+          await updateDoc(doc(db, "deliveries", idToUse!), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
