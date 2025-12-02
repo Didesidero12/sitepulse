@@ -14,11 +14,6 @@ export default function DriverView() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS
-  const hasRun = useRef(false);
-  if (hasRun.current) return null;
-  hasRun.current = true;
-
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
@@ -29,16 +24,18 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — ONE TRUCK ONLY
+  // GPS TRACKING — FINAL, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
+
+    let currentDeliveryId = deliveryId;
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        if (!deliveryId) {
+        if (!currentDeliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -48,9 +45,10 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          setDeliveryId(docRef.id);
+          currentDeliveryId = docRef.id;
+          setDeliveryId(currentDeliveryId);
         } else {
-          await updateDoc(doc(db, "deliveries", deliveryId), {
+          await updateDoc(doc(db, "deliveries", currentDeliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
@@ -61,7 +59,7 @@ export default function DriverView() {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, id, deliveryId]);
+  }, [tracking, id]);
 
   // I’VE ARRIVED
   const handleArrival = async () => {
@@ -95,7 +93,7 @@ export default function DriverView() {
     return () => map.current?.remove();
   }, []);
 
-  // Blue dot update
+  // Blue dot
   useEffect(() => {
     if (!map.current || !location) return;
     if (marker.current) marker.current.remove();
