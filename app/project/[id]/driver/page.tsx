@@ -137,8 +137,14 @@ useEffect(() => {
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, id]);
+    return () => navigator.geolocation.getCurrentPosition(
+  () => { /* success, continue */ },
+  (err) => {
+    if (err.code === 1) {
+      alert("Please allow location access in your browser settings to use tracking.");
+    }
+  }
+);
 
   // I’VE ARRIVED — FIXED TO USE THE CORRECT ID
   const handleArrival = async () => {
