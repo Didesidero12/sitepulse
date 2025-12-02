@@ -32,7 +32,7 @@ export default function DriverView() {
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(newLoc);
+        setLocation(newLoc(newLoc);
 
         if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
@@ -60,7 +60,7 @@ export default function DriverView() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, id]);
 
-  // Map init — once
+  // Map init
   useEffect(() => {
     if (!mapContainer.current) return;
 
