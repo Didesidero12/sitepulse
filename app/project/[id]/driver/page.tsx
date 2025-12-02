@@ -24,7 +24,24 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-// Replace your existing GPS useEffect with this
+  // GEOFENCING — ALERTS AT 30/15/5 MIN
+  const checkGeofence = (loc: { lat: number; lng: number }) => {
+    const getDistance = (loc1: any, loc2: any) => {
+      const R = 3958.8;
+      const toRad = (x: number) => (x * Math.PI) / 180;
+      const dLat = toRad(loc2.lat - loc1.lat);
+      const dLon = toRad(loc2.lng - loc1.lng);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(loc1.lat)) * Math.cos(toRad(loc2.lat)) * Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    const dist = getDistance(loc, siteLocation);
+    if (dist < 30 && dist > 15) alert("30 MIN OUT — FORKLIFT NEEDED");
+    if (dist < 15 && dist > 5) alert("15 MIN OUT — PREPARE UNLOAD");
+    if (dist < 5) alert("5 MIN OUT — I'M HERE!");
+  };
+
 useEffect(() => {
   if (!tracking) return;
 
