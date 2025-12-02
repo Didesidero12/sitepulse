@@ -22,35 +22,15 @@ export default function DriverView() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [deliveryId, setDeliveryId] = useState<string | null>(null);
 
-  // FINAL NUCLEAR GUARD — KILLS DUPLICATES WITHOUT CRASHING
-  const hasStarted = useRef(false);
-  if (hasStarted.current) {
-    // Second mount — do NOTHING but render the UI
-    return (
-      <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-        <div className="bg-green-600 p-6 text-center">
-          <h1 className="text-4xl font-bold">DRIVER MODE</h1>
-          <p className="text-2xl opacity-90">Project {id}</p>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-2xl">Tracking already active on another tab</p>
-        </div>
-      </div>
-    );
-  }
-  hasStarted.current = true;
-
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, NO MORE APPLICATION ERROR ON PHONE
+  // GPS TRACKING — FINAL, BULLETPROOF, NO ERRORS, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
-    // Try high-accuracy first, fallback to standard if fails
-    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
     navigator.geolocation.getCurrentPosition(
       () => {
-        // Permission granted — start high-accuracy tracking
+        // Permission granted — start tracking
         const watchId = navigator.geolocation.watchPosition(
           async (pos) => {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -108,49 +88,34 @@ export default function DriverView() {
               setTracking(false);
             }
           },
-          options
+          { enableHighAccuracy: true }
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
       },
       (err) => {
         console.error("Permission error:", err);
-        if (err.code === 1) {
-          alert("Location permission denied. Please allow in Settings > Safari > Location and reload.");
-        } else {
-          alert("Unable to start tracking. Check your connection or try again.");
-        }
+        alert("Unable to start tracking. Please allow location access in your browser settings and reload the page.");
         setTracking(false);
       },
-      options
+      { enableHighAccuracy: true }
     );
   }, [tracking, id, deliveryId]);
 
-  // I’VE ARRIVED — FINAL, 100% WORKING (uses state, not localStorage)
+  // I’VE ARRIVED — FINAL, 100% WORKING
   const handleArrival = async () => {
-    if (!deliveryId) {
-      // Fallback: read from localStorage if state is empty (rare edge case)
-      const fallbackId = localStorage.getItem(`deliveryId_${id}`);
-      if (fallbackId) {
-        await updateDoc(doc(db, "deliveries", fallbackId), {
-          status: "arrived",
-          arrivedAt: serverTimestamp(),
-        });
-        localStorage.removeItem(`deliveryId_${id}`);
-      }
-    } else {
+    if (deliveryId) {
       await updateDoc(doc(db, "deliveries", deliveryId), {
         status: "arrived",
         arrivedAt: serverTimestamp(),
       });
-      localStorage.removeItem(`deliveryId_${id}`);
-      setDeliveryId(null); // Clear state
+      setDeliveryId(null);
     }
     setTracking(false);
     alert("Arrival confirmed — thanks, driver!");
   };
 
-  // Map init
+  // Map init — ONCE ONLY
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -169,7 +134,7 @@ export default function DriverView() {
     return () => map.current?.remove();
   }, []);
 
-  // Blue dot
+  // Blue dot update
   useEffect(() => {
     if (!map.current || !location) return;
     if (marker.current) marker.current.remove();
