@@ -26,16 +26,12 @@ export default function DriverView() {
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
   // GPS TRACKING — FINAL, 100% WORKING, ONE TRUCK ONLY
-    useEffect(() => {
+  useEffect(() => {
     if (!tracking) return;
-    if (hasStarted.current) return;     // ← BLOCKS SECOND+ RUN
+    if (hasStarted.current) return;
     hasStarted.current = true;
 
-    // Read from state OR localStorage
-    const storedId = localStorage.getItem(`deliveryId_${id}`);
-    if (storedId && !deliveryId) {
-      setDeliveryId(storedId);  // ← THIS LINE WAS MISSING
-    }
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -52,8 +48,9 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          setDeliveryId(docRef.id);
-          localStorage.setItem(`deliveryId_${id}`, docRef.id);
+          deliveryId = docRef.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
+          setDeliveryId(deliveryId);   // ← THIS KEEPS STATE IN SYNC
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -65,11 +62,11 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-return () => {
+    return () => {
       hasStarted.current = false;
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [tracking, id, deliveryId]);
+  }, [tracking, id]);
 
   // I’VE ARRIVED — FINAL, 100% WORKING (uses state, not localStorage)
   const handleArrival = async () => {
