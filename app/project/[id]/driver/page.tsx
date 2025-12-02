@@ -10,18 +10,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
-// GLOBAL SINGLETON — ONE TRACKING SESSION ONLY
-declare global {
-  var __ACTIVE_TRACKING__: {
-    watchId: number | null;
-    deliveryId: string | null;
-  } | undefined;
-}
-
-if (!global.__ACTIVE_TRACKING__) {
-  global.__ACTIVE_TRACKING__ = { watchId: null, deliveryId: null };
-}
-
 export default function DriverView() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -29,30 +17,25 @@ export default function DriverView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
+  const hasStarted = useRef(false); // ← THIS KILLS ALL DUPLICATES
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // TRACKING — FINAL, ONE TRUCK ONLY
+  // FINAL GPS TRACKING — ONE TRUCK ONLY
   useEffect(() => {
-    if (!tracking) {
-      if (global.__ACTIVE_TRACKING__?.watchId) {
-        navigator.geolocation.clearWatch(global.__ACTIVE_TRACKING__!.watchId);
-        global.__ACTIVE_TRACKING__!.watchId = null;
-      }
-      return;
-    }
+    if (!tracking) return;
+    if (hasStarted.current) return; // ← BLOCKS ALL DUPLICATES
+    hasStarted.current = true;
 
-    if (global.__ACTIVE_TRACKING__?.watchId) return; // Already running
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
-
-        let deliveryId = global.__ACTIVE_TRACKING__!.deliveryId;
 
         if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
@@ -65,7 +48,7 @@ export default function DriverView() {
             timestamp: serverTimestamp(),
           });
           deliveryId = docRef.id;
-          global.__ACTIVE_TRACKING__!.deliveryId = deliveryId;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -77,27 +60,24 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    global.__ACTIVE_TRACKING__!.watchId = watchId;
-
     return () => {
-      if (global.__ACTIVE_TRACKING__?.watchId) {
-        navigator.geolocation.clearWatch(global.__ACTIVE_TRACKING__!.watchId);
-        global.__ACTIVE_TRACKING__!.watchId = null;
-      }
+      navigator.geolocation.clearWatch(watchId);
+      hasStarted.current = false;
     };
   }, [tracking, id]);
 
-  // I’VE ARRIVED
+  // I’VE ARRIVED — FINAL
   const handleArrival = async () => {
-    const deliveryId = global.__ACTIVE_TRACKING__?.deliveryId;
-    if (deliveryId) {
-      await updateDoc(doc(db, "deliveries", deliveryId), {
+    const currentId = localStorage.getItem(`deliveryId_${id}`);
+    if (currentId) {
+      await updateDoc(doc(db, "deliveries", currentId), {
         status: "arrived",
         arrivedAt: serverTimestamp(),
       });
-      global.__ACTIVE_TRACKING__!.deliveryId = null;
+      localStorage.removeItem(`deliveryId_${id}`);
     }
     setTracking(false);
+    hasStarted.current = false;
     alert("Arrival confirmed — thanks, driver!");
   };
 
