@@ -24,55 +24,63 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, ONE TRUCK ONLY
-  useEffect(() => {
-    if (!tracking) return;
+// GPS TRACKING — FINAL, NO DUPLICATES
+useEffect(() => {
+  if (!tracking) return;
 
-    const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(newLoc);
+  const hasRun = useRef(false);
+  if (hasRun.current) return;
+  hasRun.current = true;
 
-        if (!deliveryId) {
-          const docRef = await addDoc(collection(db, "deliveries"), {
-            projectId: id,
-            material: "Doors from Italy",
-            qty: "12 bifolds",
-            needsForklift: true,
-            driverLocation: newLoc,
-            status: "en_route",
-            timestamp: serverTimestamp(),
-          });
-          setDeliveryId(docRef.id);
-        } else {
-          await updateDoc(doc(db, "deliveries", deliveryId), {
-            driverLocation: newLoc,
-            lastUpdate: serverTimestamp(),
-          });
-        }
-      },
-      (err) => console.error("GPS error:", err),
-      { enableHighAccuracy: true }
-    );
+  let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
-    // ← CLEANUP FIXED — NO TYPO
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [tracking, id, deliveryId]);
+  const watchId = navigator.geolocation.watchPosition(
+    async (pos) => {
+      const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocation(newLoc);
 
-  // I'VE ARRIVED
-  const handleArrival = async () => {
-    if (deliveryId) {
-      await updateDoc(doc(db, "deliveries", deliveryId), {
-        status: "arrived",
-        arrivedAt: serverTimestamp(),
-      });
-      setDeliveryId(null);
-    }
-    setTracking(false);
-    alert("Arrival confirmed — thanks, driver!");
+      if (!deliveryId) {
+        const docRef = await addDoc(collection(db, "deliveries"), {
+          projectId: id,
+          material: "Doors from Italy",
+          qty: "12 bifolds",
+          needsForklift: true,
+          driverLocation: newLoc,
+          status: "en_route",
+          timestamp: serverTimestamp(),
+        });
+        deliveryId = docRef.id;
+        localStorage.setItem(`deliveryId_${id}`, deliveryId);
+      } else {
+        await updateDoc(doc(db, "deliveries", deliveryId), {
+          driverLocation: newLoc,
+          lastUpdate: serverTimestamp(),
+        });
+      }
+    },
+    (err) => console.error("GPS error:", err),
+    { enableHighAccuracy: true }
+  );
+
+  return () => {
+    hasRun.current = false;
+    navigator.geolocation.clearWatch(watchId);
   };
+}, [tracking, id]);
+
+// I’VE ARRIVED — FINAL, CLEANS EVERYTHING
+const handleArrival = async () => {
+  let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+  if (deliveryId) {
+    await updateDoc(doc(db, "deliveries", deliveryId), {
+      status: "arrived",
+      arrivedAt: serverTimestamp(),
+    });
+    localStorage.removeItem(`deliveryId_${id}`);
+  }
+  setTracking(false);
+  alert("Arrival confirmed — thanks, driver!");
+};
 
   // Map init
   useEffect(() => {
