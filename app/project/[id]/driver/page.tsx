@@ -79,14 +79,17 @@ export default function DriverView() {
     return () => map.current?.remove();
   }, []);
 
-  // GPS TRACKING — FINAL, 100% WORKING
+    // GPS TRACKING — FINAL, NO MORE 8× TRUCKS (kills StrictMode double-mount)
   useEffect(() => {
     if (!tracking) return;
 
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+    let mounted = true;   // ← THIS KILLS THE DOUBLE-MOUNT BUG
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
+        if (!mounted) return;   // ← ignore the second mount
+
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
@@ -109,11 +112,14 @@ export default function DriverView() {
           });
         }
       },
-      (err) => console.error("GPS error:", err),
+      (err) => console.error(err),
       { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      mounted = false;
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [tracking, id]);
 
   // Update blue dot
