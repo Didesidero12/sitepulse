@@ -79,19 +79,17 @@ export default function DriverView() {
     return () => map.current?.remove();
   }, []);
 
-  // GPS TRACKING — FINAL, BULLETPROOF, WILL WORK 100%
+  // GPS TRACKING — WITH PERMISSION ERROR HANDLING
   useEffect(() => {
     if (!tracking) return;
 
     navigator.geolocation.getCurrentPosition(
       () => {
+        // Permission granted — start watching
         const watchId = navigator.geolocation.watchPosition(
           async (pos) => {
-            console.log("GPS ping received:", pos.coords.latitude, pos.coords.longitude);
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setLocation(newLoc);
-
-            let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
             if (!deliveryId) {
               const docRef = await addDoc(collection(db, "deliveries"), {
@@ -103,23 +101,25 @@ export default function DriverView() {
                 status: "en_route",
                 timestamp: serverTimestamp(),
               });
-              deliveryId = docRef.id;
-              localStorage.setItem(`deliveryId_${id}`, deliveryId);
-              console.log("NEW DELIVERY CREATED:", deliveryId);
+              setDeliveryId(docRef.id);
             } else {
               await updateDoc(doc(db, "deliveries", deliveryId), {
                 driverLocation: newLoc,
                 lastUpdate: serverTimestamp(),
               });
             }
+
+            checkGeofence(newLoc);
           },
-          (err) => console.error("GPS ERROR:", err),
+          (err) => console.error(err),
           { enableHighAccuracy: true }
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
       },
-      (err) => console.error("PERMISSION DENIED:", err),
+      (err) => {
+        alert("Location permission denied. Please allow in browser settings to track.");
+      },
       { enableHighAccuracy: true }
     );
   }, [tracking, id]);
