@@ -23,14 +23,16 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-   // GPS TRACKING — FINAL, 100% ONE TRUCK ONLY
+  // GPS TRACKING — FINAL, 100% ONE TRUCK ONLY (uses window guard)
   useEffect(() => {
     if (!tracking) return;
 
-    // ← THIS REF KILLS ALL DUPLICATES FOREVER
-    const effectRan = { current: false };
-    if (effectRan.current) return;
-    effectRan.current = true;
+    // GLOBAL GUARD — ONLY ONE TRACKING SESSION EVER
+    if ((window as any).__SITEPULSE_TRACKING_ACTIVE) {
+      console.log("Tracking already active — ignoring duplicate");
+      return;
+    }
+    (window as any).__SITEPULSE_TRACKING_ACTIVE = true;
 
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
@@ -40,19 +42,22 @@ export default function DriverView() {
         setLocation(newLoc);
 
         if (!deliveryId) {
-          const docRef = await addDoc(collection(db, "deliveries"), {
-            projectId: id,
-            material: "Doors from Italy",
-            qty: "12 bifolds",
-            needsForklift: true,
-            driverLocation: newLoc,
-            status: "en_route",
-            timestamp: serverTimestamp(),
-          });
-          deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
+          const createDelivery = async () => {
+            const docRef = await addDoc(collection(db, "deliveries"), {
+              projectId: id,
+              material: "Doors from Italy",
+              qty: "12 bifolds",
+              needsForklift: true,
+              driverLocation: newLoc,
+              status: "en_route",
+              timestamp: serverTimestamp(),
+            });
+            deliveryId = docRef.id;
+            localStorage.setItem(`deliveryId_${id}`, deliveryId);
+          };
+          createDelivery();
         } else {
-          await updateDoc(doc(db, "deliveries", deliveryId), {
+          updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
@@ -64,6 +69,7 @@ export default function DriverView() {
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
+      (window as any).__SITEPULSE_TRACKING_ACTIVE = false;
     };
   }, [tracking, id]);
 
