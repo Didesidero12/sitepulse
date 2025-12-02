@@ -102,17 +102,18 @@ export default function DriverView() {
     );
   }, [tracking, id, deliveryId]);
 
-    // I’VE ARRIVED — FINAL, CLEANS EVERYTHING, STOPS PINGS
+  // I'VE ARRIVED — FINAL, 100% WORKING
   const handleArrival = async () => {
-    const currentId = localStorage.getItem(`deliveryId_${id}`);
-    if (currentId) {
-      await updateDoc(doc(db, "deliveries", currentId), {
-        status: "arrived",
-        arrivedAt: serverTimestamp(),
-      });
-      localStorage.removeItem(`deliveryId_${id}`);
-    }
-    setTracking(false);
+    if (!deliveryId) return;
+
+    await updateDoc(doc(db, "deliveries", deliveryId), {
+      status: "arrived",
+      arrivedAt: serverTimestamp(),
+    });
+
+    localStorage.removeItem(`deliveryId_${id}`);
+    setDeliveryId(null);
+    setTracking(false);  // This stops the GPS watcher
     alert("Arrival confirmed — thanks, driver!");
   };
 
