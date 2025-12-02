@@ -24,11 +24,9 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, 100% WORKING, ONE TRUCK ONLY
+  // FINAL GPS TRACKING — ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
-
-    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -45,9 +43,7 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
-          setDeliveryId(deliveryId);   // ← THIS LINE WAS MISSING
+          setDeliveryId(docRef.id);
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -59,20 +55,17 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [tracking, id]);
+    return () => navigator.geolocation.clearWatch(watch(watchId);
+  }, [tracking, id, deliveryId]);
 
-  // I’VE ARRIVED — FINAL
+  // I'VE ARRIVED
   const handleArrival = async () => {
-    const currentId = localStorage.getItem(`deliveryId_${id}`);
-    if (currentId) {
-      await updateDoc(doc(db, "deliveries", currentId), {
+    if (deliveryId) {
+      await updateDoc(doc(db, "deliveries", deliveryId), {
         status: "arrived",
         arrivedAt: serverTimestamp(),
       });
-      localStorage.removeItem(`deliveryId_${id}`);
+      setDeliveryId(null);
     }
     setTracking(false);
     alert("Arrival confirmed — thanks, driver!");
