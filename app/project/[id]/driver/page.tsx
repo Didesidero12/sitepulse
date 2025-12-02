@@ -17,20 +17,19 @@ export default function DriverView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
-  const hasStarted = useRef(false); // ← THIS KILLS ALL DUPLICATES
+  const hasStarted = useRef(false);
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [deliveryId, setDeliveryId] = useState<string | null>(null);
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
   // FINAL GPS TRACKING — ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
-    if (hasStarted.current) return; // ← BLOCKS ALL DUPLICATES
+    if (hasStarted.current) return;
     hasStarted.current = true;
-
-    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -47,8 +46,7 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
+          setDeliveryId(docRef.id);
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -64,20 +62,18 @@ export default function DriverView() {
       navigator.geolocation.clearWatch(watchId);
       hasStarted.current = false;
     };
-  }, [tracking, id]);
+  }, [tracking, id, deliveryId]);
 
   // I’VE ARRIVED — FINAL
   const handleArrival = async () => {
-    const currentId = localStorage.getItem(`deliveryId_${id}`);
-    if (currentId) {
-      await updateDoc(doc(db, "deliveries", currentId), {
+    if (deliveryId) {
+      await updateDoc(doc(db, "deliveries", deliveryId), {
         status: "arrived",
         arrivedAt: serverTimestamp(),
       });
-      localStorage.removeItem(`deliveryId_${id}`);
+      setDeliveryId(null);
     }
     setTracking(false);
-    hasStarted.current = false;
     alert("Arrival confirmed — thanks, driver!");
   };
 
