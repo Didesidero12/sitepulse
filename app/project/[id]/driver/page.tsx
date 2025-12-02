@@ -16,7 +16,7 @@ export default function DriverView() {
 
   // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS
   const hasRun = useRef(false);
-  if (hasRun.current) return null;   // ← SECOND MOUNT DIES HERE
+  if (hasRun.current) return null;
   hasRun.current = true;
 
   const mapContainer = useRef<HTMLDivElement>(null);
