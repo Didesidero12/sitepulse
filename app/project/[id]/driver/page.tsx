@@ -24,11 +24,10 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, NO MORE APPLICATION ERRORS, ONE TRUCK ONLY
+  // GPS TRACKING — FINAL, NO ERRORS, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
-    // Read deliveryId ONCE at the start — avoid localStorage in async callback
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
@@ -38,7 +37,6 @@ export default function DriverView() {
 
         try {
           if (!deliveryId) {
-            // CREATE ONCE
             const docRef = await addDoc(collection(db, "deliveries"), {
               projectId: id,
               material: "Doors from Italy",
@@ -51,7 +49,6 @@ export default function DriverView() {
             deliveryId = docRef.id;
             localStorage.setItem(`deliveryId_${id}`, deliveryId);
           } else {
-            // UPDATE EXISTING
             await updateDoc(doc(db, "deliveries", deliveryId), {
               driverLocation: newLoc,
               lastUpdate: serverTimestamp(),
@@ -65,13 +62,8 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
+    // ← CLEANUP IS NOW PROPERLY INSIDE THE RETURNED FUNCTION
     return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [tracking, id]);
-
-    return () => {
-      runOnce.current = false;
       navigator.geolocation.clearWatch(watchId);
     };
   }, [tracking, id]);
