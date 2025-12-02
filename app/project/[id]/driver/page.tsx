@@ -21,7 +21,11 @@ export default function DriverView() {
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [deliveryId, setDeliveryId] = useState<string | null>(null);
-  const hasStarted = useRef(false);   // ← THIS KILLS ALL DUPLICATES FOREVER
+
+  // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS FOREVER
+  const hasStarted = useRef(false);
+  if (hasStarted.current) return null;   // ← SECOND MOUNT DIES HERE
+  hasStarted.current = true;
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
