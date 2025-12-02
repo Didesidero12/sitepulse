@@ -25,7 +25,12 @@ export default function DriverView() {
 
   // GPS TRACKING — FINAL, 100% ONE TRUCK ONLY (uses window guard)
   useEffect(() => {
-    if (!tracking) return;
+    if (!tracking) {
+      stopTracking();
+      return;
+    }
+    startTracking(id, (loc) => setLocation(loc));
+  }, [tracking, id]);
 
     // GLOBAL GUARD — ONLY ONE TRACKING SESSION EVER
     if ((window as any).__SITEPULSE_TRACKING_ACTIVE) {
@@ -143,9 +148,10 @@ export default function DriverView() {
           {tracking ? "STOP TRACKING" : "START TRACKING"}
         </button>
 
+        {/* I'VE ARRIVED BUTTON — NOW JUST STOPS TRACKING (arrival handled in service) */}
         {tracking && (
           <button
-            onClick={handleArrival}
+            onClick={() => setTracking(false)}
             className="w-full py-16 text-6xl font-bold bg-yellow-500 hover:bg-yellow-600 rounded-3xl transition-all"
           >
             I'VE ARRIVED
