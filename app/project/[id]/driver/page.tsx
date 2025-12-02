@@ -24,48 +24,49 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-// GPS TRACKING — FINAL, NO DUPLICATES
+// GPS TRACKING — WITH PERMISSION CHECK + ERROR HANDLING
 useEffect(() => {
   if (!tracking) return;
 
-  const hasRun = useRef(false);
-  if (hasRun.current) return;
-  hasRun.current = true;
+  navigator.geolocation.getCurrentPosition(
+    () => {
+      // Permission granted — start tracking
+      const watchId = navigator.geolocation.watchPosition(
+        async (pos) => {
+          const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setLocation(newLoc);
 
-  let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+          if (!deliveryId) {
+            const docRef = await addDoc(collection(db, "deliveries"), {
+              projectId: id,
+              material: "Doors from Italy",
+              qty: "12 bifolds",
+              needsForklift: true,
+              driverLocation: newLoc,
+              status: "en_route",
+              timestamp: serverTimestamp(),
+            });
+            setDeliveryId(docRef.id);
+          } else {
+            await updateDoc(doc(db, "deliveries", deliveryId), {
+              driverLocation: newLoc,
+              lastUpdate: serverTimestamp(),
+            });
+          }
+        },
+        (err) => console.error("GPS error:", err),
+        { enableHighAccuracy: true }
+      );
 
-  const watchId = navigator.geolocation.watchPosition(
-    async (pos) => {
-      const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setLocation(newLoc);
-
-      if (!deliveryId) {
-        const docRef = await addDoc(collection(db, "deliveries"), {
-          projectId: id,
-          material: "Doors from Italy",
-          qty: "12 bifolds",
-          needsForklift: true,
-          driverLocation: newLoc,
-          status: "en_route",
-          timestamp: serverTimestamp(),
-        });
-        deliveryId = docRef.id;
-        localStorage.setItem(`deliveryId_${id}`, deliveryId);
-      } else {
-        await updateDoc(doc(db, "deliveries", deliveryId), {
-          driverLocation: newLoc,
-          lastUpdate: serverTimestamp(),
-        });
-      }
+      return () => navigator.geolocation.clearWatch(watchId);
     },
-    (err) => console.error("GPS error:", err),
+    (err) => {
+      console.error("Permission error:", err);
+      alert("Unable to start tracking. Please allow location access in your browser settings and reload the page.");
+      setTracking(false);  // Reset tracking if permission denied
+    },
     { enableHighAccuracy: true }
   );
-
-  return () => {
-    hasRun.current = false;
-    navigator.geolocation.clearWatch(watchId);
-  };
 }, [tracking, id]);
 
 // I’VE ARRIVED — FINAL, CLEANS EVERYTHING
