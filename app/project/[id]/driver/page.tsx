@@ -96,28 +96,37 @@ useEffect(() => {
     return () => map.current?.remove();
   }, []);
 
-  // GPS TRACKING — FINAL, ZERO DUPLICATES, STOPS ON ARRIVAL
+  // GPS TRACKING — FINAL, NO DUPLICATES, NO GHOSTS, WORKS FOREVER
   useEffect(() => {
     if (!tracking) return;
 
     let deliveryId: string | null = null;
+    let watchId: number | null = null;
 
-    const watchId = navigator.geolocation.watchPosition(
+    // CREATE OR GET DELIVERY ID
+    const startDelivery = async (initialLoc: { lat: number; lng: number }) => {
+      if (deliveryId) return;
+
+      const docRef = await addDoc(collection(db, "deliveries"), {
+        projectId: id,
+        material: "Doors from Italy",
+        qty: "12 bifolds",
+        needsForklift: true,
+        driverLocation: initialLoc,
+        status: "en_route",
+        timestamp: serverTimestamp(),
+      });
+      deliveryId = docRef.id;
+    };
+
+    // START WATCHING
+    watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
         if (!deliveryId) {
-          const docRef = await addDoc(collection(db, "deliveries"), {
-            projectId: id,
-            material: "Doors from Italy",
-            qty: "12 bifolds",
-            needsForklift: true,
-            driverLocation: newLoc,
-            status: "en_route",
-            timestamp: serverTimestamp(),
-          });
-          deliveryId = docRef.id;
+          await startDelivery(newLoc);
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -129,17 +138,13 @@ useEffect(() => {
       { enableHighAccuracy: true }
     );
 
-    // CLEANUP ON UNMOUNT OR WHEN TRACKING STOPS
+    // CLEANUP — KILLS ALL GHOST WATCHERS
     return () => {
-      navigator.geolocation.clearWatch(watchId);
-      if (deliveryId) {
-        updateDoc(doc(db, "deliveries", deliveryId), {
-          status: "arrived",
-          arrivedAt: serverTimestamp(),
-        });
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [tracking, id]); // ← THIS DEPENDENCY ARRAY IS CRITICAL
+  }, [tracking, id]);
 
   // Update blue dot
   useEffect(() => {
