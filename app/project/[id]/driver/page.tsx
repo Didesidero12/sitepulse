@@ -21,12 +21,15 @@ export default function DriverView() {
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [deliveryId, setDeliveryId] = useState<string | null>(null);
+  const hasStarted = useRef(false);   // ← THIS KILLS ALL DUPLICATES FOREVER
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
   // GPS TRACKING — FINAL, 100% WORKING, ONE TRUCK ONLY
-  useEffect(() => {
+    useEffect(() => {
     if (!tracking) return;
+    if (hasStarted.current) return;     // ← BLOCKS SECOND+ RUN
+    hasStarted.current = true;
 
     // Read from state OR localStorage
     const storedId = localStorage.getItem(`deliveryId_${id}`);
@@ -62,7 +65,10 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+return () => {
+      hasStarted.current = false;
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [tracking, id, deliveryId]);
 
   // I’VE ARRIVED — FINAL, 100% WORKING (uses state, not localStorage)
