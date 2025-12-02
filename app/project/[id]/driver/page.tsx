@@ -81,7 +81,24 @@ export default function DriverView() {
                 async (pos) => {
                   const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                   setLocation(newLoc);
-                  // ... same addDoc/updateDoc logic as above ...
+
+                  if (!deliveryId) {
+                    const docRef = await addDoc(collection(db, "deliveries"), {
+                      projectId: id,
+                      material: "Doors from Italy",
+                      qty: "12 bifolds",
+                      needsForklift: true,
+                      driverLocation: newLoc,
+                      status: "en_route",
+                      timestamp: serverTimestamp(),
+                    });
+                    setDeliveryId(docRef.id);
+                  } else {
+                    await updateDoc(doc(db, "deliveries", deliveryId), {
+                      driverLocation: newLoc,
+                      lastUpdate: serverTimestamp(),
+                    });
+                  }
                 },
                 (err) => console.error("Fallback GPS error:", err),
                 { enableHighAccuracy: false }
