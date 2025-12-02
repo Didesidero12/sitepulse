@@ -23,20 +23,12 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, 100% ONE TRUCK ONLY (uses window guard)
+  // GPS TRACKING — FINAL, BULLETPROOF, ONE TRUCK ONLY
   useEffect(() => {
-    if (!tracking) {
-      stopTracking();
-      return;
-    }
-    startTracking(id, (loc) => setLocation(loc));
-  }, [tracking, id]);
+    if (!tracking) return;
 
-    // GLOBAL GUARD — ONLY ONE TRACKING SESSION EVER
-    if ((window as any).__SITEPULSE_TRACKING_ACTIVE) {
-      console.log("Tracking already active — ignoring duplicate");
-      return;
-    }
+    // Prevent double-start
+    if ((window as any).__SITEPULSE_TRACKING_ACTIVE) return;
     (window as any).__SITEPULSE_TRACKING_ACTIVE = true;
 
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
@@ -47,22 +39,19 @@ export default function DriverView() {
         setLocation(newLoc);
 
         if (!deliveryId) {
-          const createDelivery = async () => {
-            const docRef = await addDoc(collection(db, "deliveries"), {
-              projectId: id,
-              material: "Doors from Italy",
-              qty: "12 bifolds",
-              needsForklift: true,
-              driverLocation: newLoc,
-              status: "en_route",
-              timestamp: serverTimestamp(),
-            });
-            deliveryId = docRef.id;
-            localStorage.setItem(`deliveryId_${id}`, deliveryId);
-          };
-          createDelivery();
+          const docRef = await addDoc(collection(db, "deliveries"), {
+            projectId: id,
+            material: "Doors from Italy",
+            qty: "12 bifolds",
+            needsForklift: true,
+            driverLocation: newLoc,
+            status: "en_route",
+            timestamp: serverTimestamp(),
+          });
+          deliveryId = docRef.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
         } else {
-          updateDoc(doc(db, "deliveries", deliveryId), {
+          await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
@@ -72,6 +61,7 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
+    // ← THIS WAS MISSING — NOW FIXED
     return () => {
       navigator.geolocation.clearWatch(watchId);
       (window as any).__SITEPULSE_TRACKING_ACTIVE = false;
