@@ -19,11 +19,10 @@ export default function SuperWarRoom() {{deliveries.length
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Realtime deliveries — WITH REAL ETA + CLEAN CODE
+  // Realtime deliveries — WITH ETA + ALERTS + NO MISSING BRACES
   useEffect(() => {
-    // Distance in miles between two points
     const getDistance = (loc1: { lat: number; lng: number }, loc2: { lat: number; lng: number }) => {
-      const R = 3958.8; // Earth radius in miles
+      const R = 3958.8;
       const toRad = (x: number) => (x * Math.PI) / 180;
       const dLat = toRad(loc2.lat - loc1.lat);
       const dLon = toRad(loc2.lng - loc1.lng);
@@ -50,7 +49,6 @@ export default function SuperWarRoom() {{deliveries.length
           const distanceMiles = getDistance(data.driverLocation, siteLocation);
           const etaMin = Math.round(distanceMiles / 0.833);
 
-          // 30 / 15 / 5 MIN ALERTS
           if ([30, 15, 5].includes(etaMin) && !seenEtas.has(etaMin)) {
             seenEtas.add(etaMin);
             const material = data.material || "Delivery";
@@ -64,7 +62,7 @@ export default function SuperWarRoom() {{deliveries.length
       setDeliveries(list);
     });
 
-    return unsub;
+    return () => unsub();
   }, [id]);
 
   const getDistance = (loc1: any, loc2: any) => {
