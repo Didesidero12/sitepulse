@@ -20,45 +20,45 @@ export default function DriverView() {
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [deliveryId, setDeliveryId] = useState<string | null>(null);   // ← ADD THIS LINE HERE
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, PERFECT, ONE TRUCK ONLY
-  useEffect(() => {
-    if (!tracking) return;
+// Replace your existing GPS useEffect with this
+useEffect(() => {
+  if (!tracking) return;
 
-    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+  const watchId = navigator.geolocation.watchPosition(
+    async (pos) => {
+      const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocation(newLoc);
 
-    const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(newLoc);
-
-        if (!deliveryId) {
-          const docRef = await addDoc(collection(db, "deliveries"), {
+      if (!deliveryId) {
+        const docRef = await addDoc(collection(db, "deliveries"), {
           projectId: id,
           material: "Doors from Italy",
-           qty: "12 bifolds",
+          qty: "12 bifolds",
           needsForklift: true,
           driverLocation: newLoc,
-          status: "en_route",           // ← THIS LINE WAS MISSING
+          status: "en_route",
           timestamp: serverTimestamp(),
         });
-          deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
-        } else {
-          await updateDoc(doc(db, "deliveries", deliveryId), {
-            driverLocation: newLoc,
-            lastUpdate: serverTimestamp(),
-          });
-        }
-      },
-      (err) => console.error(err),
-      { enableHighAccuracy: true }
-    );
+        setDeliveryId(docRef.id);  // Set the ID in state
+      } else {
+        await updateDoc(doc(db, "deliveries", deliveryId), {
+          driverLocation: newLoc,
+          lastUpdate: serverTimestamp(),
+        });
+      }
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, id]);
+      checkGeofence(newLoc);
+    },
+    (err) => console.error("GPS error:", err),
+    { enableHighAccuracy: true }
+  );
+
+  return () => navigator.geolocation.clearWatch(watchId);
+}, [tracking, id, deliveryId]);  // Add deliveryId to dependencies to re-run on change
 
   // Map init
   useEffect(() => {
