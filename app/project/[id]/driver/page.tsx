@@ -10,7 +10,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
-// GLOBAL SINGLETON — ONLY ONE TRACKING SESSION EVER
+// GLOBAL SINGLETON — ONE TRACKING SESSION ONLY
 declare global {
   var __ACTIVE_TRACKING__: {
     watchId: number | null;
@@ -87,7 +87,7 @@ export default function DriverView() {
     };
   }, [tracking, id]);
 
-  // I’VE ARRIVED — FINAL
+  // I’VE ARRIVED
   const handleArrival = async () => {
     const deliveryId = global.__ACTIVE_TRACKING__?.deliveryId;
     if (deliveryId) {
@@ -101,7 +101,7 @@ export default function DriverView() {
     alert("Arrival confirmed — thanks, driver!");
   };
 
-  // Map init — FIXED QUOTES
+  // Map init
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -119,3 +119,53 @@ export default function DriverView() {
 
     return () => map.current?.remove();
   }, []);
+
+  // Update blue dot
+  useEffect(() => {
+    if (!map.current || !location) return;
+    if (marker.current) marker.current.remove();
+
+    marker.current = new mapboxgl.Marker({ color: "blue" })
+      .setLngLat([location.lng, location.lat])
+      .addTo(map.current);
+
+    map.current.easeTo({ center: [location.lng, location.lat], zoom: 16, duration: 1000 });
+  }, [location]);
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      <div className="bg-green-600 p-6 text-center">
+        <h1 className="text-4xl font-bold">DRIVER MODE</h1>
+        <p className="text-2xl opacity-90">Project {id}</p>
+      </div>
+
+      <div className="flex-1 p-6">
+        <div
+          ref={mapContainer}
+          className="w-full rounded-2xl bg-gray-800 overflow-hidden"
+          style={{ height: "65vh" }}
+        />
+      </div>
+
+      <div className="p-6 space-y-6">
+        <button
+          onClick={() => setTracking(!tracking)}
+          className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
+            tracking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {tracking ? "STOP TRACKING" : "START TRACKING"}
+        </button>
+
+        {tracking && (
+          <button
+            onClick={handleArrival}
+            className="w-full py-16 text-6xl font-bold bg-yellow-500 hover:bg-yellow-600 rounded-3xl transition-all"
+          >
+            I'VE ARRIVED
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
