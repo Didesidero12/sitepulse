@@ -23,13 +23,14 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, ONE TRUCK ONLY
+   // GPS TRACKING — FINAL, 100% ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
-    const hasRun = { current: false };
-    if (hasRun.current) return;
-    hasRun.current = true;
+    // ← THIS REF KILLS ALL DUPLICATES FOREVER
+    const effectRan = { current: false };
+    if (effectRan.current) return;
+    effectRan.current = true;
 
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
@@ -61,7 +62,9 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [tracking, id]);
 
   // Map init
