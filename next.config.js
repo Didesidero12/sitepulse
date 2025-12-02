@@ -1,14 +1,7 @@
+// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'mapbox.com',
-      },
-    ],
-  },
+  reactStrictMode: false,   // ← THIS KILLS THE DOUBLE-MOUNT BUG
 };
 
 module.exports = nextConfig;
