@@ -101,7 +101,7 @@ export default function DriverView() {
     alert("Arrival confirmed — thanks, driver!");
   };
 
-  // Map init + blue dot (unchanged)
+  // Map init — FIXED QUOTES
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -114,4 +114,8 @@ export default function DriverView() {
 
     new mapboxgl.Marker({ color: "green" })
       .setLngLat([siteLocation.lng, siteLocation.lat])
-      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h
+      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+      .addTo(map.current);
+
+    return () => map.current?.remove();
+  }, []);
