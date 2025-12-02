@@ -24,18 +24,22 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, ONE TRUCK ONLY
+  // GPS TRACKING — FINAL, NO DUPLICATES, NO RE-RENDERS ISSUE
   useEffect(() => {
     if (!tracking) return;
 
-    let currentDeliveryId = deliveryId;
+    const runOnce = useRef(false);
+    if (runOnce.current) return;
+    runOnce.current = true;
+
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        if (!currentDeliveryId) {
+        if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -45,10 +49,10 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          currentDeliveryId = docRef.id;
-          setDeliveryId(currentDeliveryId);
+          deliveryId = docRef.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
         } else {
-          await updateDoc(doc(db, "deliveries", currentDeliveryId), {
+          await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
@@ -58,17 +62,21 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      runOnce.current = false;
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [tracking, id]);
 
-  // I’VE ARRIVED
+  // I’VE ARRIVED — FINAL
   const handleArrival = async () => {
-    if (deliveryId) {
-      await updateDoc(doc(db, "deliveries", deliveryId), {
+    const currentId = localStorage.getItem(`deliveryId_${id}`);
+    if (currentId) {
+      await updateDoc(doc(db, "deliveries", currentId), {
         status: "arrived",
         arrivedAt: serverTimestamp(),
       });
-      setDeliveryId(null);
+      localStorage.removeItem(`deliveryId_${id}`);
     }
     setTracking(false);
     alert("Arrival confirmed — thanks, driver!");
