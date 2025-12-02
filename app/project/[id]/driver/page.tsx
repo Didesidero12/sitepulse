@@ -23,7 +23,7 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS + Firestore — ONE TRUCK ONLY
+  // GPS TRACKING — FINAL, PERFECT, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
@@ -32,7 +32,7 @@ export default function DriverView() {
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(newLoc(newLoc);
+        setLocation(newLoc);
 
         if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
