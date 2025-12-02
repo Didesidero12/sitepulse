@@ -96,20 +96,21 @@ useEffect(() => {
     return () => map.current?.remove();
   }, []);
 
-  // GPS TRACKING — FINAL, ONE TRUCK FOREVER, NO GHOSTS
+  // GPS TRACKING — FINAL, NO MORE MULTIPLE DELIVERIES
   useEffect(() => {
     if (!tracking) return;
 
-    // Use a single delivery ID for the entire session
-    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
+    const hasCreated = useRef(false);  // Ref to prevent multiple creations
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        if (!deliveryId) {
-          // CREATE ONCE
+        if (!deliveryId && !hasCreated.current) {
+          console.log("Creating new delivery doc...");
+          hasCreated.current = true;  // Set flag to true — only create ONCE
           const docRef = await addDoc(collection(db, "deliveries"), {
             projectId: id,
             material: "Doors from Italy",
@@ -121,21 +122,22 @@ useEffect(() => {
           });
           deliveryId = docRef.id;
           localStorage.setItem(`deliveryId_${id}`, deliveryId);
-        } else {
-          // UPDATE EXISTING
+          console.log("New delivery created:", deliveryId);
+        } else if (deliveryId) {
+          console.log("Updating delivery:", deliveryId);
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
           });
         }
+
+        checkGeofence(newLoc);
       },
       (err) => console.error("GPS error:", err),
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
-    return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-    };
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, id]);
 
   // I’VE ARRIVED — FIXED TO USE THE CORRECT ID
