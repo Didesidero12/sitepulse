@@ -14,10 +14,14 @@ export default function DriverView() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
+  // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS FOREVER
+  const hasRun = useRef(false);
+  if (hasRun.current) return null;   // ← SECOND MOUNT DIES HERE
+  hasRun.current = true;
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
-  const hasStarted = useRef(false);
 
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
