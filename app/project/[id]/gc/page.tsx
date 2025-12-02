@@ -42,7 +42,7 @@ export default function SuperWarRoom() {{deliveries.length
 
     const unsub = onSnapshot(q, (snap) => {
       const list: any[] = [];
-      const seenEtas = new Set<number>(); // Prevent duplicate alerts in one snapshot
+      const seenEtas = new Set<number>(); // Prevent duplicate alerts
 
       snap.forEach((doc) => {
         const data = doc.data();
@@ -50,7 +50,7 @@ export default function SuperWarRoom() {{deliveries.length
           const distanceMiles = getDistance(data.driverLocation, siteLocation);
           const etaMin = Math.round(distanceMiles / 0.833);
 
-          // PUSH ALERTS AT 30, 15, 5 MIN
+          // 30 / 15 / 5 MIN ALERTS
           if ([30, 15, 5].includes(etaMin) && !seenEtas.has(etaMin)) {
             seenEtas.add(etaMin);
             const material = data.material || "Delivery";
