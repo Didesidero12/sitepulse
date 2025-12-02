@@ -102,14 +102,15 @@ export default function DriverView() {
     );
   }, [tracking, id, deliveryId]);
 
-  // I’VE ARRIVED — FINAL, 100% WORKING
+    // I’VE ARRIVED — FINAL, CLEANS EVERYTHING, STOPS PINGS
   const handleArrival = async () => {
-    if (deliveryId) {
-      await updateDoc(doc(db, "deliveries", deliveryId), {
+    const currentId = localStorage.getItem(`deliveryId_${id}`);
+    if (currentId) {
+      await updateDoc(doc(db, "deliveries", currentId), {
         status: "arrived",
         arrivedAt: serverTimestamp(),
       });
-      setDeliveryId(null);
+      localStorage.removeItem(`deliveryId_${id}`);
     }
     setTracking(false);
     alert("Arrival confirmed — thanks, driver!");
