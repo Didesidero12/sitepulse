@@ -85,11 +85,29 @@ export default function SuperWarRoom() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-purple-700 p-8 text-center">
+            <div className="bg-purple-700 p-8 text-center">
         <h1 className="text-6xl font-bold">SUPER WAR ROOM</h1>
         <p className="text-3xl mt-2">
           Project {id} — {deliveries.length} truck{deliveries.length !== 1 ? "s" : ""} en route
         </p>
+
+        {/* QUICK TICKET BUTTON — FOR TESTING */}
+        <button
+          onClick={async () => {
+            await addDoc(collection(db, "tickets"), {
+              projectId: id,
+              material: "Doors from Italy",
+              qty: "12 bifolds",
+              needsForklift: true,
+              status: "pending",
+              driverId: null,
+            });
+            alert("Quick ticket created!");
+          }}
+          className="mt-8 bg-green-600 hover:bg-green-700 text-white text-2xl font-bold py-4 px-10 rounded-2xl shadow-2xl transition-all hover:scale-105"
+        >
+          + Quick Ticket (Test)
+        </button>
       </div>
 
       <div className="flex-1 p-6">
