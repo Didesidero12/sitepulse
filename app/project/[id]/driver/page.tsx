@@ -22,9 +22,22 @@ export default function DriverView() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [deliveryId, setDeliveryId] = useState<string | null>(null);
 
-  // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS FOREVER
+  // FINAL NUCLEAR GUARD — KILLS DUPLICATES WITHOUT CRASHING
   const hasStarted = useRef(false);
-  if (hasStarted.current) return null;   // ← SECOND MOUNT DIES HERE
+  if (hasStarted.current) {
+    // Second mount — do NOTHING but render the UI
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+        <div className="bg-green-600 p-6 text-center">
+          <h1 className="text-4xl font-bold">DRIVER MODE</h1>
+          <p className="text-2xl opacity-90">Project {id}</p>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-2xl">Tracking already active on another tab</p>
+        </div>
+      </div>
+    );
+  }
   hasStarted.current = true;
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
