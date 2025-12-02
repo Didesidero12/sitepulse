@@ -208,8 +208,6 @@ export default function SuperWarRoom() {{deliveries.length
       </div>
     </div>
   );
-}   // ← closes the return JSX
-
-}   // ← THIS CLOSES THE COMPONENT FUNCTION (THIS WAS MISSING)
+}   // ← THIS ONE closes the return JSX AND the component function
 
 export default SuperWarRoom;
