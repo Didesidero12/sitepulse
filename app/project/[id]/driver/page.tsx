@@ -24,7 +24,7 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // FINAL GPS TRACKING — ONE TRUCK ONLY
+  // GPS TRACKING — FINAL, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
@@ -55,7 +55,10 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => navigator.geolocation.clearWatch(watch(watchId);
+    // ← CLEANUP FIXED — NO TYPO
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [tracking, id, deliveryId]);
 
   // I'VE ARRIVED
