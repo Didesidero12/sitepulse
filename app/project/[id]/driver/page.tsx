@@ -45,8 +45,6 @@ export default function DriverView() {
   // GPS TRACKING — FINAL, 100% WORKING, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
-    if (hasStarted.current) return;
-    hasStarted.current = true;
 
     let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
 
@@ -67,7 +65,7 @@ export default function DriverView() {
           });
           deliveryId = docRef.id;
           localStorage.setItem(`deliveryId_${id}`, deliveryId);
-          setDeliveryId(deliveryId);   // ← THIS KEEPS STATE IN SYNC
+          setDeliveryId(deliveryId);
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -79,10 +77,10 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-      return () => {
-      hasStarted.current = false;   // ← THIS LINE WAS MISSING — RESETS GUARD
+    return () => {
       navigator.geolocation.clearWatch(watchId);
     };
+  }, [tracking, id]);
   }, [tracking, id, deliveryId]);
 
   // I’VE ARRIVED — FINAL, 100% WORKING (uses state, not localStorage)
