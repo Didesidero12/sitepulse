@@ -10,6 +10,18 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
+// GLOBAL SINGLETON — ONLY ONE TRACKING SESSION EVER
+declare global {
+  var __ACTIVE_TRACKING__: {
+    watchId: number | null;
+    deliveryId: string | null;
+  } | undefined;
+}
+
+if (!global.__ACTIVE_TRACKING__) {
+  global.__ACTIVE_TRACKING__ = { watchId: null, deliveryId: null };
+}
+
 export default function DriverView() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -23,20 +35,24 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, BULLETPROOF, ONE TRUCK ONLY
+  // TRACKING — FINAL, ONE TRUCK ONLY
   useEffect(() => {
-    if (!tracking) return;
+    if (!tracking) {
+      if (global.__ACTIVE_TRACKING__?.watchId) {
+        navigator.geolocation.clearWatch(global.__ACTIVE_TRACKING__!.watchId);
+        global.__ACTIVE_TRACKING__!.watchId = null;
+      }
+      return;
+    }
 
-    // Prevent double-start
-    if ((window as any).__SITEPULSE_TRACKING_ACTIVE) return;
-    (window as any).__SITEPULSE_TRACKING_ACTIVE = true;
-
-    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+    if (global.__ACTIVE_TRACKING__?.watchId) return; // Already running
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
+
+        let deliveryId = global.__ACTIVE_TRACKING__!.deliveryId;
 
         if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
@@ -49,7 +65,7 @@ export default function DriverView() {
             timestamp: serverTimestamp(),
           });
           deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
+          global.__ACTIVE_TRACKING__!.deliveryId = deliveryId;
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -61,14 +77,31 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    // ← THIS WAS MISSING — NOW FIXED
+    global.__ACTIVE_TRACKING__!.watchId = watchId;
+
     return () => {
-      navigator.geolocation.clearWatch(watchId);
-      (window as any).__SITEPULSE_TRACKING_ACTIVE = false;
+      if (global.__ACTIVE_TRACKING__?.watchId) {
+        navigator.geolocation.clearWatch(global.__ACTIVE_TRACKING__!.watchId);
+        global.__ACTIVE_TRACKING__!.watchId = null;
+      }
     };
   }, [tracking, id]);
 
-  // Map init
+  // I’VE ARRIVED — FINAL
+  const handleArrival = async () => {
+    const deliveryId = global.__ACTIVE_TRACKING__?.deliveryId;
+    if (deliveryId) {
+      await updateDoc(doc(db, "deliveries", deliveryId), {
+        status: "arrived",
+        arrivedAt: serverTimestamp(),
+      });
+      global.__ACTIVE_TRACKING__!.deliveryId = null;
+    }
+    setTracking(false);
+    alert("Arrival confirmed — thanks, driver!");
+  };
+
+  // Map init + blue dot (unchanged)
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -81,73 +114,4 @@ export default function DriverView() {
 
     new mapboxgl.Marker({ color: "green" })
       .setLngLat([siteLocation.lng, siteLocation.lat])
-      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-      .addTo(map.current);
-
-    return () => map.current?.remove();
-  }, []);
-
-  // Update blue dot
-  useEffect(() => {
-    if (!map.current || !location) return;
-    if (marker.current) marker.current.remove();
-
-    marker.current = new mapboxgl.Marker({ color: "blue" })
-      .setLngLat([location.lng, location.lat])
-      .addTo(map.current);
-
-    map.current.easeTo({ center: [location.lng, location.lat], zoom: 16, duration: 1000 });
-  }, [location]);
-
-  // I’VE ARRIVED
-  const handleArrival = async () => {
-    const currentId = localStorage.getItem(`deliveryId_${id}`);
-    if (currentId) {
-      await updateDoc(doc(db, "deliveries", currentId), {
-        status: "arrived",
-        arrivedAt: serverTimestamp(),
-      });
-      localStorage.removeItem(`deliveryId_${id}`);
-    }
-    setTracking(false);
-    alert("Arrival confirmed — thanks, driver!");
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-green-600 p-6 text-center">
-        <h1 className="text-4xl font-bold">DRIVER MODE</h1>
-        <p className="text-2xl opacity-90">Project {id}</p>
-      </div>
-
-      <div className="flex-1 p-6">
-        <div
-          ref={mapContainer}
-          className="w-full rounded-2xl bg-gray-800 overflow-hidden"
-          style={{ height: "65vh" }}
-        />
-      </div>
-
-      <div className="p-6 space-y-6">
-        <button
-          onClick={() => setTracking(!tracking)}
-          className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
-            tracking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
-          }`}
-        >
-          {tracking ? "STOP TRACKING" : "START TRACKING"}
-        </button>
-
-        {/* I'VE ARRIVED BUTTON — NOW JUST STOPS TRACKING (arrival handled in service) */}
-        {tracking && (
-          <button
-            onClick={() => setTracking(false)}
-            className="w-full py-16 text-6xl font-bold bg-yellow-500 hover:bg-yellow-600 rounded-3xl transition-all"
-          >
-            I'VE ARRIVED
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h
