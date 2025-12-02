@@ -19,7 +19,7 @@ export default function SuperWarRoom() {{deliveries.length
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Realtime deliveries — WITH ETA + ALERTS + NO MISSING BRACES
+  // Realtime deliveries — FINAL, 100% CORRECT BRACES
   useEffect(() => {
     const getDistance = (loc1: { lat: number; lng: number }, loc2: { lat: number; lng: number }) => {
       const R = 3958.8;
