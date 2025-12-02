@@ -42,7 +42,7 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, CATCHES PERMISSION ERRORS, ONE TRUCK ONLY
+   // GPS TRACKING — FINAL, CATCHES PERMISSION ERRORS, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
@@ -54,27 +54,32 @@ export default function DriverView() {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setLocation(newLoc);
 
-            if (!deliveryId) {
-              const docRef = await addDoc(collection(db, "deliveries"), {
-                projectId: id,
-                material: "Doors from Italy",
-                qty: "12 bifolds",
-                needsForklift: true,
-                driverLocation: newLoc,
-                status: "en_route",
-                timestamp: serverTimestamp(),
-              });
-              setDeliveryId(docRef.id);
-            } else {
-              await updateDoc(doc(db, "deliveries", deliveryId), {
-                driverLocation: newLoc,
-                lastUpdate: serverTimestamp(),
-              });
+            try {
+              if (!deliveryId) {
+                const docRef = await addDoc(collection(db, "deliveries"), {
+                  projectId: id,
+                  material: "Doors from Italy",
+                  qty: "12 bifolds",
+                  needsForklift: true,
+                  driverLocation: newLoc,
+                  status: "en_route",
+                  timestamp: serverTimestamp(),
+                });
+                setDeliveryId(docRef.id);
+              } else {
+                await updateDoc(doc(db, "deliveries", deliveryId), {
+                  driverLocation: newLoc,
+                  lastUpdate: serverTimestamp(),
+                });
+              }
+            } catch (err) {
+              console.error("Firestore error:", err);
+              alert("Unable to update location. Check your connection or try again.");
             }
           },
           (err) => {
             console.error("GPS error:", err);
-            alert("GPS error. Check your connection or try again.");
+            alert("GPS error. Check your location settings or try again.");
             setTracking(false);
           },
           { enableHighAccuracy: true }
