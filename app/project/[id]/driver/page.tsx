@@ -79,6 +79,43 @@ export default function DriverView() {
     return () => map.current?.remove();
   }, []);
 
+  // GPS TRACKING — FINAL, 100% WORKING
+  useEffect(() => {
+    if (!tracking) return;
+
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocation(newLoc);
+
+        if (!deliveryId) {
+          const docRef = await addDoc(collection(db, "deliveries"), {
+            projectId: id,
+            material: "Doors from Italy",
+            qty: "12 bifolds",
+            needsForklift: true,
+            driverLocation: newLoc,
+            status: "en_route",
+            timestamp: serverTimestamp(),
+          });
+          deliveryId = docRef.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
+        } else {
+          await updateDoc(doc(db, "deliveries", deliveryId), {
+            driverLocation: newLoc,
+            lastUpdate: serverTimestamp(),
+          });
+        }
+      },
+      (err) => console.error("GPS error:", err),
+      { enableHighAccuracy: true }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [tracking, id]);
+
   // Update blue dot
   useEffect(() => {
     if (!map.current || !location) return;
