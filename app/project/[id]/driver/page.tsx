@@ -27,6 +27,10 @@ export default function DriverView() {
   useEffect(() => {
     if (!tracking) return;
 
+    const hasRun = { current: false };
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
