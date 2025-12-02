@@ -100,34 +100,29 @@ export default function DriverView() {
       .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
       .addTo(map.current);
 
-    return () => map.current?.remove();
-  }, []);
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      <div className="bg-green-600 p-6 text-center">
+        <h1 className="text-4xl font-bold">DRIVER MODE</h1>
+        <p className="text-2xl opacity-90">Project {id}</p>
+      </div>
 
-  // Update BLUE DRIVER DOT whenever location changes — THIS WAS MISSING (Driver page)
-  useEffect(() => {
-    if (!map.current || !location) return;
+      <div className="p-6 space-y-6 flex-1">
+        <div className="bg-gray-800 rounded-2xl p-8 text-center">
+          <h2 className="text-3xl font-bold text-green-400 mb-4">DELIVERY</h2>
+          <p className="text-5xl font-bold mb-2">{delivery.material}</p>
+          <p className="text-3xl mb-4">{delivery.qty}</p>
+          {delivery.needsForklift && <p className="text-red-400 text-3xl font-bold">FORKLIFT NEEDED</p>}
+        </div>
 
-    if (marker.current) marker.current.remove();
-
-    marker.current = new mapboxgl.Marker({ color: "blue" })
-      .setLngLat([location.lng, location.lat])
-      .addTo(map.current);
-
-    map.current.flyTo({ center: [location.lng, location.lat], zoom: 16 });
-  }, [location]);
-
-         <button
-          onClick={() => setTracking(!tracking)}
-          className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
-            tracking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
-          }`}
-        >
-          {tracking ? "STOP TRACKING" : "START TRACKING"}
-        </button>
+        <div
+          ref={mapContainer}
+          className="w-full rounded-2xl bg-gray-800 overflow-hidden"
+          style={{ height: "65vh" }}
+        />
 
         {/* BUTTONS — CLEAN, PERFECT, NO DUPLICATES */}
         <div className="space-y-6">
-          {/* START / STOP TRACKING BUTTON */}
           <button
             onClick={() => setTracking(!tracking)}
             className={`w-full py-16 text-6xl font-bold rounded-3xl transition-all ${
@@ -137,7 +132,6 @@ export default function DriverView() {
             {tracking ? "STOP TRACKING" : "START TRACKING"}
           </button>
 
-          {/* I'VE ARRIVED BUTTON — ONLY SHOWS WHEN TRACKING */}
           {tracking && (
             <button
               onClick={async () => {
