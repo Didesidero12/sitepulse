@@ -29,11 +29,9 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // FINAL GPS TRACKING — ONE TRUCK ONLY
+  // GPS TRACKING — ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
-    if (hasStarted.current) return;
-    hasStarted.current = true;
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -62,13 +60,10 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-      hasStarted.current = false;
-    };
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, id, deliveryId]);
 
-  // I’VE ARRIVED — FINAL
+  // I’VE ARRIVED
   const handleArrival = async () => {
     if (deliveryId) {
       await updateDoc(doc(db, "deliveries", deliveryId), {
@@ -100,7 +95,7 @@ export default function DriverView() {
     return () => map.current?.remove();
   }, []);
 
-  // Update blue dot
+  // Blue dot update
   useEffect(() => {
     if (!map.current || !location) return;
     if (marker.current) marker.current.remove();
