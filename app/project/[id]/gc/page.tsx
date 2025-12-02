@@ -33,11 +33,11 @@ export default function SuperWarRoom() {
       return R * c;
     };
 
-    const q = query(
-      collection(db, "deliveries"),
-      where("projectId", "==", id),
-      where("status", "==", "en_route")
-    );
+      const q = query(
+        collection(db, "tickets"),
+        where("projectId", "==", id),
+        where("status", "==", "en_route")
+      );
 
     const unsub = onSnapshot(q, (snap) => {
       const list: any[] = [];
