@@ -12,9 +12,10 @@ mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZ
 
 export default function DriverView() {
   const params = useParams();
+  ();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS FOREVER
+  // FINAL NUCLEAR GUARD — KILLS ALL DUPLICATE MOUNTS
   const hasRun = useRef(false);
   if (hasRun.current) return null;   // ← SECOND MOUNT DIES HERE
   hasRun.current = true;
