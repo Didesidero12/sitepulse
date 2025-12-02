@@ -45,8 +45,14 @@ export default function DriverView() {
   // GPS TRACKING — FINAL, 100% WORKING, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
+    if (hasStarted.current) return;
+    hasStarted.current = true;
 
-    let deliveryId = localStorage.getItem(`deliveryId_${id}`) || null;
+    // Read from state OR localStorage
+    const storedId = localStorage.getItem(`deliveryId_${id}`);
+    if (storedId && !deliveryId) {
+      setDeliveryId(storedId);
+    }
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -63,9 +69,8 @@ export default function DriverView() {
             status: "en_route",
             timestamp: serverTimestamp(),
           });
-          deliveryId = docRef.id;
-          localStorage.setItem(`deliveryId_${id}`, deliveryId);
-          setDeliveryId(deliveryId);
+          setDeliveryId(docRef.id);
+          localStorage.setItem(`deliveryId_${id}`, docRef.id);
         } else {
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
@@ -78,9 +83,9 @@ export default function DriverView() {
     );
 
     return () => {
+      hasStarted.current = false;
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [tracking, id]);
   }, [tracking, id, deliveryId]);
 
   // I’VE ARRIVED — FINAL, 100% WORKING (uses state, not localStorage)
