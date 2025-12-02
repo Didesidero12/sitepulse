@@ -96,38 +96,33 @@ useEffect(() => {
     return () => map.current?.remove();
   }, []);
 
-  // GPS TRACKING — FINAL, NO DUPLICATES, NO GHOSTS, WORKS FOREVER
+  // GPS TRACKING — FINAL, ONE TRUCK FOREVER, NO GHOSTS
   useEffect(() => {
     if (!tracking) return;
 
-    let deliveryId: string | null = null;
-    let watchId: number | null = null;
+    // Use a single delivery ID for the entire session
+    let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
-    // CREATE OR GET DELIVERY ID
-    const startDelivery = async (initialLoc: { lat: number; lng: number }) => {
-      if (deliveryId) return;
-
-      const docRef = await addDoc(collection(db, "deliveries"), {
-        projectId: id,
-        material: "Doors from Italy",
-        qty: "12 bifolds",
-        needsForklift: true,
-        driverLocation: initialLoc,
-        status: "en_route",
-        timestamp: serverTimestamp(),
-      });
-      deliveryId = docRef.id;
-    };
-
-    // START WATCHING
-    watchId = navigator.geolocation.watchPosition(
+    const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
         if (!deliveryId) {
-          await startDelivery(newLoc);
+          // CREATE ONCE
+          const docRef = await addDoc(collection(db, "deliveries"), {
+            projectId: id,
+            material: "Doors from Italy",
+            qty: "12 bifolds",
+            needsForklift: true,
+            driverLocation: newLoc,
+            status: "en_route",
+            timestamp: serverTimestamp(),
+          });
+          deliveryId = docRef.id;
+          localStorage.setItem(`deliveryId_${id}`, deliveryId);
         } else {
+          // UPDATE EXISTING
           await updateDoc(doc(db, "deliveries", deliveryId), {
             driverLocation: newLoc,
             lastUpdate: serverTimestamp(),
@@ -138,13 +133,24 @@ useEffect(() => {
       { enableHighAccuracy: true }
     );
 
-    // CLEANUP — KILLS ALL GHOST WATCHERS
     return () => {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-      }
+      if (watchId) navigator.geolocation.clearWatch(watchId);
     };
   }, [tracking, id]);
+
+  // I’VE ARRIVED — FIXED TO USE THE CORRECT ID
+  const handleArrival = async () => {
+    const currentId = localStorage.getItem(`deliveryId_${id}`);
+    if (currentId) {
+      await updateDoc(doc(db, "deliveries", currentId), {
+        status: "arrived",
+        arrivedAt: serverTimestamp(),
+      });
+      localStorage.removeItem(`deliveryId_${id}`);
+    }
+    setTracking(false);
+    alert("Arrival confirmed — thanks, driver!");
+  };
 
   // Update blue dot
   useEffect(() => {
