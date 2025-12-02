@@ -42,7 +42,7 @@ export default function SuperWarRoom() {{deliveries.length
 
     const unsub = onSnapshot(q, (snap) => {
       const list: any[] = [];
-      const seenEtas = new Set<number>(); // Prevent duplicate alerts
+      const seenEtas = new Set<number>();
 
       snap.forEach((doc) => {
         const data = doc.data();
