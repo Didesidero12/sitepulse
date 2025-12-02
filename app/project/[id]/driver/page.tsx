@@ -36,14 +36,14 @@ export default function DriverView() {
 
         if (!deliveryId) {
           const docRef = await addDoc(collection(db, "deliveries"), {
-            projectId: id,
-            material: "Doors from Italy",
-            qty: "12 bifolds",
-            needsForklift: true,
-            driverLocation: newLoc,
-            status: "en_route",
-            timestamp: serverTimestamp(),
-          });
+          projectId: id,
+          material: "Doors from Italy",
+           qty: "12 bifolds",
+          needsForklift: true,
+          driverLocation: newLoc,
+          status: "en_route",           // ← THIS LINE WAS MISSING
+          timestamp: serverTimestamp(),
+        });
           deliveryId = docRef.id;
           localStorage.setItem(`deliveryId_${id}`, deliveryId);
         } else {
