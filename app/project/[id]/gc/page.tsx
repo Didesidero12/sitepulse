@@ -10,7 +10,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
 
-export default function SuperWarRoom() {
+export default function SuperWarRoom() {{deliveries.length
   const { id } = useParams();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -19,26 +19,51 @@ export default function SuperWarRoom() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Realtime deliveries — FILTERED TO THIS PROJECT ONLY
+  // Realtime deliveries — WITH REAL ETA + CLEAN CODE
   useEffect(() => {
+    // Distance in miles between two points
+    const getDistance = (loc1: { lat: number; lng: number }, loc2: { lat: number; lng: number }) => {
+      const R = 3958.8; // Earth radius in miles
+      const toRad = (x: number) => (x * Math.PI) / 180;
+      const dLat = toRad(loc2.lat - loc1.lat);
+      const dLon = toRad(loc2.lng - loc1.lng);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(loc1.lat)) * Math.cos(toRad(loc2.lat)) * Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
     const q = query(
       collection(db, "deliveries"),
       where("projectId", "==", id),
       where("status", "==", "en_route")
     );
+
     const unsub = onSnapshot(q, (snap) => {
       const list: any[] = [];
+      const seenEtas = new Set<number>(); // Prevent duplicate alerts in one snapshot
+
       snap.forEach((doc) => {
         const data = doc.data();
-        if (data.driverLocation) {
-          const etaMin = data.driverLocation
-            ? Math.round(getDistance(data.driverLocation, siteLocation) / 0.833) // ~50 mph avg
-            : null;
-          list.push({ id: doc.id, etaMin, ...data });
+        if (data.driverLocation && data.status === "en_route") {
+          const distanceMiles = getDistance(data.driverLocation, siteLocation);
+          const etaMin = Math.round(distanceMiles / 0.833);
+
+          // PUSH ALERTS AT 30, 15, 5 MIN
+          if ([30, 15, 5].includes(etaMin) && !seenEtas.has(etaMin)) {
+            seenEtas.add(etaMin);
+            const material = data.material || "Delivery";
+            alert(`${material} — ${etaMin} MIN OUT!`);
+          }
+
+          list.push({ id: doc.id, etaMin, distanceMiles, ...data });
         }
       });
+
       setDeliveries(list);
     });
+
     return unsub;
   }, [id]);
 
@@ -98,7 +123,7 @@ export default function SuperWarRoom() {
     const loc = d.driverLocation;
     if (!loc) return;
 
-    const color = d.etaMin > 30 ? "red" : d.etaMin > 0 ? "yellow" : "green";
+    const color = d.etaMin > 30 ? "red" : d.etaMin > 10 ? "yellow" : "green";
 
     if (markers.current.has(d.id)) {
       markers.current.get(d.id)!.setLngLat([loc.lng, loc.lat]);
@@ -121,11 +146,13 @@ export default function SuperWarRoom() {
     }
   };
 
-  return (
+   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="bg-purple-700 p-8 text-center">
         <h1 className="text-6xl font-bold">SUPER WAR ROOM</h1>
-        <p className="text-3xl mt-2">Project {id} — {deliveries.length} truck{deliveries.length !== 1 ? "s" : ""} en route</p>
+        <p className="text-3xl mt-2">
+          Project {id} — {deliveries.length} truck{deliveries.length !== 1 ? "s" : ""} en route
+        </p>
       </div>
 
       <div className="flex-1 p-6">
@@ -137,25 +164,48 @@ export default function SuperWarRoom() {
       </div>
 
       <div className="p-6 bg-gray-800 max-h-96 overflow-y-auto">
-        <h2 className="text-4xl font-bold mb-4">Live Deliveries</h2>
+        <h2 className="text-4xl font-bold mb-6 text-center">Live Deliveries</h2>
+
         {deliveries.length === 0 ? (
-          <p className="text-center text-gray-400 text-2xl">No trucks en route</p>
+          <p className="text-center text-gray-400 text-2xl mt-10">No trucks en route</p>
         ) : (
-          deliveries.map((d) => (
-            <div key={d.id} className="bg-gray-700 p-4 rounded-xl mb-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <strong className="text-2xl">{d.material}</strong> • {d.qty}
-                  {d.needsForklift && <span className="ml-3 text-red-400">FORKLIFT</span>}
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-green-400">
-                    {d.etaMin === null ? "—" : d.etaMin <= 0 ? "ON SITE" : `${d.etaMin} min`}
+          // SORTED + COLOR-CODED LIST
+          [...deliveries]
+            .sort((a, b) => (a.etaMin || Infinity) - (b.etaMin || Infinity))
+            .map((d) => (
+              <div
+                key={d.id}
+                className="bg-gray-800 p-6 rounded-2xl mb-5 shadow-2xl border-l-8 transition-all hover:scale-[1.02]"
+                style={{
+                  borderLeftColor:
+                    d.etaMin > 30 ? "#ef4444" :   // red
+                    d.etaMin > 10 ? "#f59e0b" :   // amber
+                    "#22c55e",                    // green
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="text-3xl font-black text-white">
+                      {d.material} • {d.qty}
+                    </div>
+                    {d.needsForklift && (
+                      <span className="inline-block mt-3 px-4 py-2 bg-red-600 text-white text-lg font-bold rounded-full animate-pulse">
+                        FORKLIFT NEEDED
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-5xl font-black text-white leading-tight">
+                      {d.etaMin <= 0 ? "ON SITE" : `${d.etaMin}`}
+                    </div>
+                    <div className="text-2xl text-gray-300">
+                      {d.etaMin <= 0 ? "" : "min"}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            ))
         )}
       </div>
     </div>
