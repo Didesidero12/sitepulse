@@ -24,14 +24,11 @@ export default function DriverView() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // GPS TRACKING — FINAL, NO DUPLICATES, NO RE-RENDERS ISSUE
+  // GPS TRACKING — FINAL, NO MORE APPLICATION ERRORS, ONE TRUCK ONLY
   useEffect(() => {
     if (!tracking) return;
 
-    const runOnce = useRef(false);
-    if (runOnce.current) return;
-    runOnce.current = true;
-
+    // Read deliveryId ONCE at the start — avoid localStorage in async callback
     let deliveryId = localStorage.getItem(`deliveryId_${id}`);
 
     const watchId = navigator.geolocation.watchPosition(
@@ -39,30 +36,39 @@ export default function DriverView() {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newLoc);
 
-        // FINAL ANTI-DUPLICATE GUARD — ONLY CREATE ONCE
-        if (!deliveryId && !localStorage.getItem(`deliveryId_${id}`)) {
-          const docRef = await addDoc(collection(db, "deliveries"), {
-            projectId: id,
-            material: "Doors from Italy",
-            qty: "12 bifolds",
-            needsForklift: true,
-            driverLocation: newLoc,
-            status: "en_route",
-            timestamp: serverTimestamp(),
-          });
-          localStorage.setItem(`deliveryId_${id}`, docRef.id);
-          setDeliveryId(docRef.id);
-        } else if (deliveryId || localStorage.getItem(`deliveryId_${id}`)) {
-          const idToUse = deliveryId || localStorage.getItem(`deliveryId_${id}`);
-          await updateDoc(doc(db, "deliveries", idToUse!), {
-            driverLocation: newLoc,
-            lastUpdate: serverTimestamp(),
-          });
+        try {
+          if (!deliveryId) {
+            // CREATE ONCE
+            const docRef = await addDoc(collection(db, "deliveries"), {
+              projectId: id,
+              material: "Doors from Italy",
+              qty: "12 bifolds",
+              needsForklift: true,
+              driverLocation: newLoc,
+              status: "en_route",
+              timestamp: serverTimestamp(),
+            });
+            deliveryId = docRef.id;
+            localStorage.setItem(`deliveryId_${id}`, deliveryId);
+          } else {
+            // UPDATE EXISTING
+            await updateDoc(doc(db, "deliveries", deliveryId), {
+              driverLocation: newLoc,
+              lastUpdate: serverTimestamp(),
+            });
+          }
+        } catch (err) {
+          console.error("Firestore error:", err);
         }
       },
       (err) => console.error("GPS error:", err),
       { enableHighAccuracy: true }
     );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [tracking, id]);
 
     return () => {
       runOnce.current = false;
