@@ -79,11 +79,10 @@ export default function DriverView() {
       { enableHighAccuracy: true }
     );
 
-    return () => {
-      hasStarted.current = false;
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [tracking, id]);
+return () => {
+  hasStarted.current = false;  // ← THIS LINE IS CRITICAL
+  navigator.geolocation.clearWatch(watchId);
+};
 
   // I’VE ARRIVED — FINAL, 100% WORKING (uses state, not localStorage)
   const handleArrival = async () => {
