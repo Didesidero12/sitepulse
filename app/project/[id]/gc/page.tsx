@@ -64,7 +64,7 @@ export default function SuperWarRoom() {
     return () => unsub();
   }, [id]);
 
-  // Map init
+  // Map init + LIVE DRIVER DOTS
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -75,13 +75,24 @@ export default function SuperWarRoom() {
       zoom: 14,
     });
 
+    // Job site marker
     new mapboxgl.Marker({ color: "green" })
       .setLngLat([siteLocation.lng, siteLocation.lat])
       .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-      .addTo(map.current);
+      .addTo(map.current!);
+
+    // LIVE DRIVER DOTS FROM TICKETS
+    deliveries.forEach((d) => {
+      if (d.driverLocation) {
+        new mapboxgl.Marker({ color: "cyan" })
+          .setLngLat([d.driverLocation.lng, d.driverLocation.lat])
+          .setPopup(new mapboxgl.Popup().setHTML(`<strong>${d.material}</strong><br>${d.qty}`))
+          .addTo(map.current!);
+      }
+    });
 
     return () => map.current?.remove();
-  }, []);
+  }, [deliveries]); // ← Re-run when deliveries change
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
