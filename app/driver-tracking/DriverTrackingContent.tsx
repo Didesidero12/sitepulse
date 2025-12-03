@@ -16,7 +16,7 @@ export default function DriverTrackingContent() {
 
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
-        const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const newLoc = { lng: pos.coords.longitude, lat: pos.coords.latitude };
         setLocation(newLoc);
 
         await updateDoc(doc(db, "tickets", ticketId), {

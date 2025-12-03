@@ -13,6 +13,3 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-
-// MESSAGING REMOVED — WE DON'T NEED IT YET
-// We'll add it back later when we do real push alerts

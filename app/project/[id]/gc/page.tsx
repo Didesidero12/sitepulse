@@ -14,30 +14,29 @@ export default function SuperWarRoom() {
   const { id } = useParams();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const markers = useRef(new Map<string, mapboxgl.Marker>());   // ← ADD THIS LINE
 
   const [deliveries, setDeliveries] = useState<any[]>([]);
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // Realtime deliveries with ETA + alerts
+  // Realtime deliveries with ETA + alerts — FINAL VERSION
   useEffect(() => {
-    const getDistance = (loc1: any, loc2: any) => {
+    const getDistance = (loc1: { lat: number; lng: number }, loc2: { lat: number; lng: number }) => {
       const R = 3958.8;
       const toRad = (x: number) => (x * Math.PI) / 180;
       const dLat = toRad(loc2.lat - loc1.lat);
       const dLon = toRad(loc2.lng - loc1.lng);
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(loc1.lat)) * Math.cos(toRad(loc2.lat)) * Math.sin(dLon / 2) ** 2;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(loc1.lat)) * Math.cos(toRad(loc2.lat)) * Math.sin(dLon / 2) ** 2;
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     };
 
-      const q = query(
-        collection(db, "tickets"),
-        where("projectId", "==", id),
-        where("status", "==", "en_route")
-      );
+    const q = query(
+      collection(db, "tickets"),
+      where("projectId", "==", id),
+      where("status", "==", "en_route")
+    );
 
     const unsub = onSnapshot(q, (snap) => {
       const list: any[] = [];
@@ -45,13 +44,15 @@ export default function SuperWarRoom() {
 
       snap.forEach((doc) => {
         const data = doc.data();
-        if (data.driverLocation && data.status === "en_route") {
+        if (data.driverLocation) {
           const distanceMiles = getDistance(data.driverLocation, siteLocation);
           const etaMin = Math.round(distanceMiles / 0.833);
 
+          // 30 / 15 / 5 MIN ALERTS
           if ([30, 15, 5].includes(etaMin) && !seenEtas.has(etaMin)) {
             seenEtas.add(etaMin);
-            alert(`${data.material || "Delivery"} — ${etaMin} MIN OUT!`);
+            const material = data.material || "Delivery";
+            alert(`${material} — ${etaMin} MIN OUT!`);
           }
 
           list.push({ id: doc.id, etaMin, distanceMiles, ...data });
@@ -61,38 +62,46 @@ export default function SuperWarRoom() {
       setDeliveries(list);
     });
 
-    return () => unsub();
+    return unsub;
   }, [id]);
 
-  // Map init + LIVE DRIVER DOTS
+  // Map init + LIVE DRIVER DOTS — FINAL WORKING VERSION
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [siteLocation.lng, siteLocation.lat],
-      zoom: 14,
-    });
+    // Create map if not exists
+    if (!map.current) {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [siteLocation.lng, siteLocation.lat],
+        zoom: 14,
+      });
 
-    // Job site marker
-    new mapboxgl.Marker({ color: "green" })
-      .setLngLat([siteLocation.lng, siteLocation.lat])
-      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
-      .addTo(map.current!);
+      // Job site marker (once)
+      new mapboxgl.Marker({ color: "green" })
+        .setLngLat([siteLocation.lng, siteLocation.lat])
+        .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+        .addTo(map.current);
+    }
 
-    // LIVE DRIVER DOTS FROM TICKETS
+    // Clear old markers
+    if ((map.current as any)._driverMarkers) {
+      (map.current as any)._driverMarkers.forEach((marker: any) => marker.remove());
+    }
+    (map.current as any)._driverMarkers = [];
+
+    // Add live driver dots from tickets
     deliveries.forEach((d) => {
-      if (d.driverLocation) {
-        new mapboxgl.Marker({ color: "cyan" })
+      if (d.driverLocation && d.driverLocation.lng && d.driverLocation.lat) {
+        const marker = new mapboxgl.Marker({ color: "cyan" })
           .setLngLat([d.driverLocation.lng, d.driverLocation.lat])
           .setPopup(new mapboxgl.Popup().setHTML(`<strong>${d.material}</strong><br>${d.qty}`))
           .addTo(map.current!);
+        (map.current as any)._driverMarkers.push(marker);
       }
     });
-
-    return () => map.current?.remove();
-  }, [deliveries]); // ← Re-run when deliveries change
+  }, [deliveries]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
