@@ -57,57 +57,42 @@ export default function ClaimTicket() {
       };
 
   if (claimed) return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
-      <h1 className="text-7xl font-black text-green-400 mb-12 animate-pulse">CLAIMED — GO!</h1>
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      {/* HEADER */}
+      <div className="bg-cyan-600 p-6 text-center">
+        <h1 className="text-5xl font-black">DRIVER MODE</h1>
+      </div>
 
-      <button
-        onClick={() => {
-          window.location.href = `/tracking?ticketId=${ticket.firestoreId}`;
-        }}
-        className="bg-cyan-600 hover:bg-cyan-700 text-white text-5xl font-bold py-12 px-24 rounded-3xl shadow-2xl transition-all hover:scale-110 mb-8"
-      >
-        START TRACKING
-      </button>
+      {/* LIVE MAP — EMBEDDED */}
+      <div className="flex-1">
+        <iframe
+          src={`/tracking?ticketId=${ticket.firestoreId}`}
+          className="w-full h-full border-0"
+          title="Live Tracking"
+        />
+      </div>
 
-      <button
-        onClick={async () => {
-          if (confirm("Unclaim this ticket?")) {
-            await updateDoc(doc(db, "tickets", ticket.firestoreId), {
-              status: "pending",
-              driverId: null,
-              claimedAt: null,
-            });
-            alert("Unclaimed!");
-            window.location.reload();
-          }
-        }}
-        className="bg-red-600 hover:bg-red-700 text-white text-3xl font-bold py-6 px-12 rounded-3xl"
-      >
-        Wrong ticket? Unclaim
-      </button>
+      {/* UNCLAIM BUTTON */}
+      <div className="p-6">
+        <button
+          onClick={async () => {
+            if (confirm("Unclaim this ticket?")) {
+              await updateDoc(doc(db, "tickets", ticket.firestoreId), {
+                status: "pending",
+                driverId: null,
+                claimedAt: null,
+                driverLocation: null,
+              });
+              alert("Unclaimed!");
+              window.location.reload();
+            }
+          }}
+          className="w-full bg-red-600 hover:bg-red-700 text-white text-4xl font-bold py-8 rounded-3xl"
+        >
+          Wrong ticket? Unclaim
+        </button>
+      </div>
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
-      <h1 className="text-6xl font-bold mb-10">CLAIM THIS DELIVERY</h1>
-      {ticket ? (
-        <div className="bg-gray-800 p-12 rounded-3xl text-center max-w-2xl">
-          <p className="text-5xl font-bold mb-6">{ticket.material || "Delivery"}</p>
-          <p className="text-4xl mb-10">{ticket.qty || "—"}</p>
-          {ticket.needsForklift && (
-            <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>
-          )}
-          <button
-            onClick={claimTicket}
-            className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-10 px-20 rounded-3xl shadow-2xl transition-all hover:scale-105"
-          >
-            CLAIM THIS DELIVERY
-          </button>
-        </div>
-      ) : (
-        <p className="text-4xl text-gray-400">Loading ticket details...</p>
-      )}
-    </div>
-  ); // ← THIS WAS MISSING
-}
+  // ← DELETE EVERYTHING BELOW THIS LINE (the second return)
