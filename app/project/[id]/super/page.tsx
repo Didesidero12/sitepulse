@@ -8,8 +8,6 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtaWgwYXY1bDA4dXUzZnEzM28ya2k5enAifQ.Ad7ucDv06FqdI6btbbstEg";
-
 export default function SuperWarRoom() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id; // ← FIXES THE BUILD ERROR
