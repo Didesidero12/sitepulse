@@ -9,6 +9,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import generateShortId from '@/utils/generateShortId';
 
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+
 export default function SuperWarRoom() {
   const { id } = useParams();
   const mapContainer = useRef<HTMLDivElement>(null);
