@@ -61,8 +61,10 @@ export default function ClaimTicket() {
       {/* DIRECT TRACKING — NO IFRAME */}
       <iframe
         src={`/tracking?ticketId=${ticket.firestoreId}`}
-        className="w-full flex-1 border-0"
+        className="w-full h-screen border-0"
         title="Live Tracking"
+        allow="geolocation"
+        sandbox="allow-scripts allow-same-origin allow-modals"
       />
 
       {/* UNCLAIM BUTTON BELOW MAP */}
