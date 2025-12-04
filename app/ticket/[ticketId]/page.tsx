@@ -22,19 +22,16 @@ export default function ClaimTicket() {
         let snap = await getDocs(q);
 
         if (snap.empty) {
-          const docRef = doc(db, "tickets", ticketId as string);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) snap = { docs: [docSnap] } as any;
-        }
-
-        if (!snap.empty) {
-          const data = snap.docs[0].data();
-          setTicket({ firestoreId: snap.docs[0].id, shortId: ticketId, ...data });
+          const docSnap = await getDoc(doc(db, "tickets", ticketId as string));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setTicket({ firestoreId: docSnap.id, ...data });
+          }
         } else {
-          alert("Ticket not found");
+          const data = snap.docs[0].data();
+          setTicket({ firestoreId: snap.docs[0].id, ...data });
         }
       } catch (err) {
-        console.error(err);
         alert("Error loading ticket");
       } finally {
         setLoading(false);
@@ -43,48 +40,40 @@ export default function ClaimTicket() {
     loadTicket();
   }, [ticketId]);
 
-      const claimTicket = async () => {
-        try {
-          await updateDoc(doc(db, "tickets", ticket.firestoreId), {
-            status: "en_route",
-            driverId: "driver_001",
-            claimedAt: serverTimestamp(),
-          });
-          setClaimed(true);
-        } catch (err) {
-          alert("Failed to claim: " + err.message);
-        }
-      };
+  const claim = async () => {
+    if (!ticket?.firestoreId) return;
+    await updateDoc(doc(db, "tickets", ticket.firestoreId), {
+      status: "en_route",
+      driverId: "driver_001",
+      claimedAt: serverTimestamp(),
+    });
+    setClaimed(true);
+  };
 
-  if (claimed) {
-    // FULL SCREEN MAP — NO IFRAME, NO TINY BOX, NO WHITE SCREEN
-    if (typeof window !== 'undefined') {
-      window.location.href = `/tracking?ticketId=${ticket.firestoreId}`;
-    }
-    return null;
-  }
+  if (loading) return <p className="text-6xl text-center mt-40">Loading...</p>;
+  if (claimed) return (
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-8">
+      <h1 className="text-7xl font-black text-green-400 mb-16 animate-pulse">CLAIMED — GO!</h1>
+      <Link href={`/driver?ticketId=${ticket.firestoreId}`}>
+        <button className="bg-cyan-600 text-white text-6xl font-bold py-20 px-48 rounded-3xl">
+          START TRACKING
+        </button>
+      </Link>
+    </div>
+  );
+  if (!ticket) return <p className="text-6xl text-red-400 text-center mt-40">Invalid Ticket</p>;
 
-  // ← THIS IS THE CLAIM SCREEN — KEEP IT!
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-8">
       <h1 className="text-6xl font-bold mb-10">CLAIM THIS DELIVERY</h1>
-      {ticket ? (
-        <div className="bg-gray-800 p-12 rounded-3xl text-center max-w-2xl">
-          <p className="text-5xl font-bold mb-6">{ticket.material || "Delivery"}</p>
-          <p className="text-4xl mb-10">{ticket.qty || "—"}</p>
-          {ticket.needsForklift && (
-            <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>
-          )}
-          <button
-            onClick={claimTicket}
-            className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-10 px-20 rounded-3xl shadow-2xl transition-all hover:scale-105"
-          >
-            CLAIM THIS DELIVERY
-          </button>
-        </div>
-      ) : (
-        <p className="text-4xl text-gray-400">Loading ticket details...</p>
-      )}
+      <div className="bg-gray-800 p-12 rounded-3xl text-center">
+        <p className="text-5xl font-bold mb-6">{ticket.material}</p>
+        <p className="text-4xl mb-10">{ticket.qty}</p>
+        {ticket.needsForklift && <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>}
+        <button onClick={claim} className="bg-green-600 text-white text-5xl font-bold py-12 px-32 rounded-3xl">
+          CLAIM THIS DELIVERY
+        </button>
+      </div>
     </div>
   );
 }
