@@ -58,12 +58,10 @@ export default function ClaimTicket() {
 
   if (claimed) return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      {/* HEADER */}
       <div className="bg-cyan-600 p-6 text-center">
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      {/* LIVE MAP — EMBEDDED */}
       <div className="flex-1">
         <iframe
           src={`/tracking?ticketId=${ticket.firestoreId}`}
@@ -72,7 +70,6 @@ export default function ClaimTicket() {
         />
       </div>
 
-      {/* UNCLAIM BUTTON */}
       <div className="p-6">
         <button
           onClick={async () => {
@@ -95,4 +92,5 @@ export default function ClaimTicket() {
     </div>
   );
 
-  // ← DELETE EVERYTHING BELOW THIS LINE (the second return)
+  // ← NOTHING BELOW THIS LINE — NO SECOND RETURN
+}
