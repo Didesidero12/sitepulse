@@ -56,13 +56,41 @@ export default function ClaimTicket() {
         }
       };
 
-  if (claimed) {
-    // Instant full-screen map — no iframe, no tiny box, no white void
-    if (typeof window !== 'undefined') {
-      window.location.href = `/tracking?ticketId=${ticket.firestoreId}`;
-    }
-    return null; // prevents flash of content
-  }
+  if (claimed) return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      <div className="bg-cyan-600 p-6 text-center">
+        <h1 className="text-5xl font-black">DRIVER MODE</h1>
+      </div>
+
+      <div className="flex-1">
+        <iframe
+          src={`/tracking?ticketId=${ticket.firestoreId}`}
+          className="w-full h-full border-0"
+          title="Live Tracking"
+        />
+      </div>
+
+      <div className="p-6">
+        <button
+          onClick={async () => {
+            if (confirm("Unclaim this ticket?")) {
+              await updateDoc(doc(db, "tickets", ticket.firestoreId), {
+                status: "pending",
+                driverId: null,
+                claimedAt: null,
+                driverLocation: null,
+              });
+              alert("Unclaimed!");
+              window.location.reload();
+            }
+          }}
+          className="w-full bg-red-600 hover:bg-red-700 text-white text-4xl font-bold py-8 rounded-3xl"
+        >
+          Wrong ticket? Unclaim
+        </button>
+      </div>
+    </div>
+  );
 
   // ← THIS IS THE CLAIM SCREEN — KEEP IT!
   return (
