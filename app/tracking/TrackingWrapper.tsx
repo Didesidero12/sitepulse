@@ -1,6 +1,6 @@
 // app/tracking/TrackingWrapper.tsx
 import { Suspense } from 'react';
-import TrackingClient from './TrackingClient';
+import TrackingClient from './page';
 
 export default function TrackingWrapper() {
   return (
