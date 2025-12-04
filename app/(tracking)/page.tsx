@@ -48,11 +48,12 @@ export default function DriverTracking() {
       </div>
 
       <div className="flex-1">
+        {/* LIVE MAP OR WAITING */}
         {location ? (
-          <MapboxMap && <MapboxMap location={location} />
+          <MapboxMap location={location} />
         ) : (
           <div className="h-full flex items-center justify-center bg-gray-800">
-            <p className="text-3xl">Waiting for GPS...</p>
+            <p className="text-4xl animate-pulse">Waiting for GPS...</p>
           </div>
         )}
       </div>
