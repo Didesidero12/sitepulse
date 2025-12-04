@@ -8,7 +8,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtYWl3a3l0eDBpM3AycXM3Z3F2aW1nY3UifQ.4oR2bX9x8Z9Y8Z9Y8Z9Y8Z"; // ← Your real token
+mapboxgl.accessToken = "pk.eyJ1IjoiZGlkZXNpZGVybzEyIiwiYSI6ImNtYWl3a3l0eDBpM3AycXM3Z3F2aW1nY3UifQ.4oR2bX9x8Z9Y8Z9Y8Z9Y8Z";
 
 export default function TrackingClient() {
   const searchParams = useSearchParams();
@@ -19,17 +19,19 @@ export default function TrackingClient() {
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
 
+  // Initialize Mapbox once
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
-      center: [-122.4194, 37.7749], // fallback
+      center: [-122.4194, 37.7749],
       zoom: 15,
     });
   }, []);
 
+  // Start GPS tracking
   useEffect(() => {
     if (!tracking || !ticketId) return;
 
@@ -43,14 +45,16 @@ export default function TrackingClient() {
           lastUpdate: serverTimestamp(),
         });
 
-        if (map.current && marker.current) {
-          marker.current.setLngLat([newLoc.lng, newLoc.lat]);
-          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
-        } else if (map.current) {
-          marker.current = new mapboxgl.Marker({ color: "#00FFFF" })
-            .setLngLat([newLoc.lng, newLoc.lat])
-            .addTo(map.current);
-          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
+        // Update map
+        if (map.current) {
+          if (marker.current) {
+            marker.current.setLngLat([newLoc.lng, newLoc.lat]);
+          } else {
+            marker.current = new mapboxgl.Marker({ color: "#00FFFF" })
+              .setLngLat([newLoc.lng, newLoc.lat])
+              .addTo(map.current);
+          }
+          map.current.easeTo({ center: [newLoc.lng, newLoc.lat], zoom: 18 });
         }
       },
       (err) => alert("GPS error: " + err.message),
@@ -60,9 +64,8 @@ export default function TrackingClient() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, ticketId]);
 
-   return (
+  return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      {/* HEADER */}
       <div className="bg-cyan-600 p-6 text-center">
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
@@ -70,7 +73,6 @@ export default function TrackingClient() {
       {/* MAP — FULL HEIGHT */}
       <div ref={mapContainer} className="flex-1 w-full" />
 
-      {/* BUTTON */}
       <div className="p-6">
         <button
           onClick={() => setTracking(!tracking)}
@@ -82,7 +84,6 @@ export default function TrackingClient() {
         </button>
       </div>
 
-      {/* COORDINATES */}
       {location && (
         <div className="text-center pb-8 text-cyan-400 text-2xl font-mono">
           {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
