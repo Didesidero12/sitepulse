@@ -43,19 +43,18 @@ export default function ClaimTicket() {
     loadTicket();
   }, [ticketId]);
 
-  const claimTicket = async () => {
-    if (!ticket?.firestoreId) return;
-    try {
-      await updateDoc(doc(db, "tickets", ticket.firestoreId), {
-        status: "en_route",
-        driverId: "driver_001",
-        claimedAt: serverTimestamp(),
-      });
-      setClaimed(true);
-    } catch (err: any) {
-      alert("Failed to claim: " + err.message);
-    }
-  };
+      const claimTicket = async () => {
+        try {
+          await updateDoc(doc(db, "tickets", ticket.firestoreId), {
+            status: "en_route",
+            driverId: "driver_001",
+            claimedAt: serverTimestamp(),
+          });
+          setClaimed(true);
+        } catch (err) {
+          alert("Failed to claim: " + err.message);
+        }
+      };
 
   if (loading) return <p className="text-6xl text-center mt-40">Loading...</p>;
   if (claimed) return (
