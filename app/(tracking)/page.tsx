@@ -2,7 +2,7 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '@/app/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
