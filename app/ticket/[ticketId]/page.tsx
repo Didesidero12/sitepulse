@@ -92,5 +92,27 @@ export default function ClaimTicket() {
     </div>
   );
 
-  // ← NOTHING BELOW THIS LINE — NO SECOND RETURN
+  // ← THIS IS THE CLAIM SCREEN — KEEP IT!
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
+      <h1 className="text-6xl font-bold mb-10">CLAIM THIS DELIVERY</h1>
+      {ticket ? (
+        <div className="bg-gray-800 p-12 rounded-3xl text-center max-w-2xl">
+          <p className="text-5xl font-bold mb-6">{ticket.material || "Delivery"}</p>
+          <p className="text-4xl mb-10">{ticket.qty || "—"}</p>
+          {ticket.needsForklift && (
+            <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>
+          )}
+          <button
+            onClick={claimTicket}
+            className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-10 px-20 rounded-3xl shadow-2xl transition-all hover:scale-105"
+          >
+            CLAIM THIS DELIVERY
+          </button>
+        </div>
+      ) : (
+        <p className="text-4xl text-gray-400">Loading ticket details...</p>
+      )}
+    </div>
+  );
 }
