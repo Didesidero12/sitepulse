@@ -2,7 +2,7 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '@/app/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -10,41 +10,51 @@ export default function DriverTracking() {
   const searchParams = useSearchParams();
   const ticketId = searchParams.get('ticketId');
   const [tracking, setTracking] = useState(false);
+  const [location, setLocation] = useState<any>(null);
 
-  const startTracking = () => {
-    if (!ticketId) {
-      alert("No ticket ID");
-      return;
-    }
+  if (!ticketId) {
+    return <p className="text-6xl text-red-400 text-center mt-40">No ticket ID — go back and claim again</p>;
+  }
 
-    navigator.geolocation.watchPosition(
+  useEffect(() => {
+    if (!tracking) return;
+
+    const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
+        const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocation(newLoc);
+
         await updateDoc(doc(db, "tickets", ticketId), {
-          driverLocation: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          driverLocation: newLoc,
           lastUpdate: serverTimestamp(),
         });
-        setTracking(true);
       },
       (err) => alert("GPS error: " + err.message),
       { enableHighAccuracy: true }
     );
-  };
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [tracking, ticketId]);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-7xl font-black mb-12">DRIVER TRACKING</h1>
-        {!tracking ? (
-          <button
-            onClick={startTracking}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white text-6xl font-bold py-16 px-40 rounded-3xl shadow-2xl"
-          >
-            START TRACKING NOW
-          </button>
-        ) : (
-          <p className="text-6xl animate-pulse text-cyan-400">TRACKING ACTIVE</p>
-        )}
-      </div>
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
+      <h1 className="text-6xl font-bold mb-10">DRIVER TRACKING</h1>
+
+      {!tracking ? (
+        <button
+          onClick={() => setTracking(true)}
+          className="bg-cyan-600 hover:bg-cyan-700 text-white text-5xl font-bold py-16 px-32 rounded-3xl shadow-2xl transition-all hover:scale-105"
+        >
+          START TRACKING NOW
+        </button>
+      ) : (
+        <div className="text-center">
+          <p className="text-5xl mb-8 animate-pulse">TRACKING ACTIVE</p>
+          <p className="text-3xl text-cyan-400">
+            {location?.lat.toFixed(6)}, {location?.lng.toFixed(6)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
