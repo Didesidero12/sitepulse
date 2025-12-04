@@ -17,19 +17,6 @@ export default function ClaimTicket() {
     const loadTicket = async () => {
       if (!ticketId) return;
 
-        if (claimed) return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
-      <h1 className="text-7xl font-black text-green-400 mb-12 animate-pulse">CLAIMED — GO!</h1>
-
-      <button
-        onClick={() => window.location.href = `/tracking?ticketId=${ticket.firestoreId}`}
-        className="bg-cyan-600 hover:bg-cyan-700 text-white text-6xl font-bold py-16 px-40 rounded-3xl shadow-2xl transition-all hover:scale-105"
-      >
-        START TRACKING NOW
-      </button>
-    </div>
-  );
-
       try {
         let q = query(collection(db, "tickets"), where("shortId", "==", ticketId as string));
         let snap = await getDocs(q);
