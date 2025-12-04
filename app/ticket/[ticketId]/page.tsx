@@ -56,28 +56,58 @@ export default function ClaimTicket() {
         }
       };
 
-  if (loading) return <p className="text-6xl text-center mt-40">Loading...</p>;
   if (claimed) return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
       <h1 className="text-7xl font-black text-green-400 mb-12 animate-pulse">CLAIMED — GO!</h1>
-        <Link href={`/tracking?ticketId=${ticket.firestoreId}`}>
-          <button>START TRACKING</button>
-        </Link>
+
+      <button
+        onClick={() => {
+          window.location.href = `/tracking?ticketId=${ticket.firestoreId}`;
+        }}
+        className="bg-cyan-600 hover:bg-cyan-700 text-white text-5xl font-bold py-12 px-24 rounded-3xl shadow-2xl transition-all hover:scale-110 mb-8"
+      >
+        START TRACKING
+      </button>
+
+      <button
+        onClick={async () => {
+          if (confirm("Unclaim this ticket?")) {
+            await updateDoc(doc(db, "tickets", ticket.firestoreId), {
+              status: "pending",
+              driverId: null,
+              claimedAt: null,
+            });
+            alert("Unclaimed!");
+            window.location.reload();
+          }
+        }}
+        className="bg-red-600 hover:bg-red-700 text-white text-3xl font-bold py-6 px-12 rounded-3xl"
+      >
+        Wrong ticket? Unclaim
+      </button>
     </div>
   );
-  if (!ticket) return <p className="text-6xl text-red-400 text-center mt-40">Invalid Ticket</p>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
       <h1 className="text-6xl font-bold mb-10">CLAIM THIS DELIVERY</h1>
-      <div className="bg-gray-800 p-12 rounded-3xl text-center max-w-2xl">
-        <p className="text-5xl font-bold mb-6">{ticket.material}</p>
-        <p className="text-4xl mb-10">{ticket.qty}</p>
-        {ticket.needsForklift && <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>}
-        <button onClick={claimTicket} className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-10 px-20 rounded-3xl">
-          CLAIM THIS DELIVERY
-        </button>
-      </div>
+      {ticket ? (
+        <div className="bg-gray-800 p-12 rounded-3xl text-center max-w-2xl">
+          <p className="text-5xl font-bold mb-6">{ticket.material || "Delivery"}</p>
+          <p className="text-4xl mb-10">{ticket.qty || "—"}</p>
+          {ticket.needsForklift && (
+            <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>
+          )}
+          <button
+            onClick={claimTicket}
+            className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-10 px-20 rounded-3xl shadow-2xl transition-all hover:scale-105"
+          >
+            CLAIM THIS DELIVERY
+          </button>
+        </div>
+      ) : (
+        <p className="text-4xl text-gray-400">Loading ticket details...</p>
+      )}
     </div>
-  );
+  ); // ← THIS WAS MISSING
 }
