@@ -12,6 +12,41 @@ export default function DriverTracking() {
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<any>(null);
 
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const marker = useRef<mapboxgl.Marker | null>(null);
+
+  // Map init
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [siteLocation.lng, siteLocation.lat],
+      zoom: 14,
+    });
+
+    new mapboxgl.Marker({ color: "green" })
+      .setLngLat([siteLocation.lng, siteLocation.lat])
+      .setPopup(new mapboxgl.Popup().setHTML("<h3>Job Site</h3>"))
+      .addTo(map.current);
+
+    return () => map.current?.remove();
+  }, []);
+
+  // Blue dot update
+  useEffect(() => {
+    if (!map.current || !location) return;
+    if (marker.current) marker.current.remove();
+
+    marker.current = new mapboxgl.Marker({ color: "blue" })
+      .setLngLat([location.lng, location.lat])
+      .addTo(map.current);
+
+    map.current.easeTo({ center: [location.lng, location.lat], zoom: 16, duration: 1000 });
+  }, [location]);
+
   if (!ticketId) {
     return <p className="text-6xl text-red-400 text-center mt-40">No ticket ID — go back and claim again</p>;
   }
