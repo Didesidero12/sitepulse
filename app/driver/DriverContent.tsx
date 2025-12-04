@@ -41,6 +41,5 @@ export default function DriverContent() {
         {tracking && <p className="text-5xl mt-10 animate-pulse text-green-400">ACTIVE</p>}
       </div>
     </div>
-    </div>
   );
 }
