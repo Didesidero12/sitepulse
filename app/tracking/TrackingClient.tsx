@@ -60,14 +60,17 @@ export default function TrackingClient() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, ticketId]);
 
-  return (
+   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      {/* HEADER */}
       <div className="bg-cyan-600 p-6 text-center">
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      <div ref={mapContainer} className="flex-1" />
+      {/* MAP — FULL HEIGHT */}
+      <div ref={mapContainer} className="flex-1 w-full" />
 
+      {/* BUTTON */}
       <div className="p-6">
         <button
           onClick={() => setTracking(!tracking)}
@@ -78,6 +81,13 @@ export default function TrackingClient() {
           {tracking ? "STOP TRACKING" : "START TRACKING NOW"}
         </button>
       </div>
+
+      {/* COORDINATES */}
+      {location && (
+        <div className="text-center pb-8 text-cyan-400 text-2xl font-mono">
+          {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+        </div>
+      )}
     </div>
   );
 }
