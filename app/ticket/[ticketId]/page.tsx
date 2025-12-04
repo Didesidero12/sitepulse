@@ -58,19 +58,15 @@ export default function ClaimTicket() {
 
   if (claimed) return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-cyan-600 p-6 text-center">
-        <h1 className="text-5xl font-black">DRIVER MODE</h1>
-      </div>
+      {/* DIRECT TRACKING — NO IFRAME */}
+      <iframe
+        src={`/tracking?ticketId=${ticket.firestoreId}`}
+        className="w-full flex-1 border-0"
+        title="Live Tracking"
+      />
 
-      <div className="flex-1">
-        <iframe
-          src={`/tracking?ticketId=${ticket.firestoreId}`}
-          className="w-full h-full border-0"
-          title="Live Tracking"
-        />
-      </div>
-
-      <div className="p-6">
+      {/* UNCLAIM BUTTON BELOW MAP */}
+      <div className="p-6 bg-gray-800">
         <button
           onClick={async () => {
             if (confirm("Unclaim this ticket?")) {
