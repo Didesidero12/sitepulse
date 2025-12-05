@@ -1,4 +1,4 @@
-// app/driver/DriverContent.tsx
+// app/tracking/page.tsx
 "use client";
 
 import { useSearchParams } from 'next/navigation';
@@ -10,7 +10,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
-export default function DriverContent() {
+export default function TrackingPage() {
   const searchParams = useSearchParams();
   const ticketId = searchParams.get('ticketId');
   const [tracking, setTracking] = useState(false);
@@ -20,19 +20,23 @@ export default function DriverContent() {
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
 
-  // Init map
+  // INIT MAP (STEP 1: BLANK BOX)
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [-122.4194, 37.7749],
-      zoom: 15,
+      center: [ -122.6765, 45.5231 ], // fallback to site location
+      zoom: 14,
     });
+
+    return () => {
+      map.current?.remove();
+    };
   }, []);
 
-  // Start tracking + update map
+  // START TRACKING + UPDATE MAP (STEP 2: COORDS + MARKER)
   useEffect(() => {
     if (!tracking || !ticketId) return;
 
@@ -46,15 +50,16 @@ export default function DriverContent() {
           lastUpdate: serverTimestamp(),
         });
 
+        // STEP 3: UPDATE MARKER + CENTER
         if (map.current) {
           if (marker.current) {
             marker.current.setLngLat([newLoc.lng, newLoc.lat]);
           } else {
-            marker.current = new mapboxgl.Marker({ color: "#00FFFF" })
+            marker.current = new mapboxgl.Marker({ color: "cyan" })
               .setLngLat([newLoc.lng, newLoc.lat])
               .addTo(map.current);
           }
-          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
+          map.current.easeTo({ center: [newLoc.lng, newLoc.lat], duration: 1000 });
         }
       },
       (err) => alert("GPS error: " + err.message),
@@ -70,8 +75,9 @@ export default function DriverContent() {
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      <div className="flex-1 relative">
-        <div ref={mapContainer} className="absolute inset-0" />
+      {/* STEP 4: MAP CONTAINER WITH FULL HEIGHT */}
+      <div className="flex-1 w-full relative">
+        <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
       </div>
 
       <div className="p-6">
@@ -84,6 +90,13 @@ export default function DriverContent() {
           {tracking ? "STOP TRACKING" : "START TRACKING NOW"}
         </button>
       </div>
+
+      {/* COORDINATES AS BONUS */}
+      {tracking && location && (
+        <p className="text-center text-xl text-cyan-300 mb-4">
+          {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+        </p>
+      )}
     </div>
   );
 }
