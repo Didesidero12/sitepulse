@@ -15,11 +15,12 @@ export default function DriverContent() {
   const ticketId = searchParams.get('ticketId');
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<any>(null);
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
 
-  // Init map
+  // INIT MAP
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -75,9 +76,14 @@ export default function DriverContent() {
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      {/* MAP */}
-      <div className="flex-1 relative">
-        <div ref={mapContainer} className="absolute inset-0" />
+      {/* MAP CONTAINER — FULL HEIGHT, VISIBLE WHEN TRACKING */}
+      <div className="flex-1 w-full bg-gray-800 relative">
+        <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+        {!tracking && (
+          <p className="absolute inset-0 flex items-center justify-center text-4xl text-gray-400">
+            Ready to start tracking
+          </p>
+        )}
       </div>
 
       {/* BUTTON */}
