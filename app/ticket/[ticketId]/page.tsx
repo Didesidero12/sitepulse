@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
 export default function ClaimTicket() {
   const { ticketId } = useParams();
