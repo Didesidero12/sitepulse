@@ -77,7 +77,7 @@ export default function DriverContent() {
       </div>
 
       {/* MAP CONTAINER — FULL HEIGHT, VISIBLE WHEN TRACKING */}
-      <div className="flex-1 w-full bg-gray-800 relative">
+      <div className="flex-1 w-full bg-gray-800 relative" style={{ height: "100vh" }}>  // ← THIS WAS MISSING — FORCES FULL HEIGHT
         <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
         {!tracking && (
           <p className="absolute inset-0 flex items-center justify-center text-4xl text-gray-400">
