@@ -20,7 +20,7 @@ export default function DriverContent() {
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
 
-  // INIT MAP
+  // INIT MAP UPFRONT (WAITING STATE)
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -36,7 +36,7 @@ export default function DriverContent() {
     };
   }, []);
 
-  // START TRACKING + UPDATE MAP
+  // START TRACKING + UPDATE MARKER
   useEffect(() => {
     if (!tracking || !ticketId) return;
 
@@ -50,7 +50,7 @@ export default function DriverContent() {
           lastUpdate: serverTimestamp(),
         });
 
-        // UPDATE MARKER
+        // UPDATE MARKER ON MAP
         if (map.current) {
           if (marker.current) {
             marker.current.setLngLat([newLoc.lng, newLoc.lat]);
@@ -59,7 +59,7 @@ export default function DriverContent() {
               .setLngLat([newLoc.lng, newLoc.lat])
               .addTo(map.current);
           }
-          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
+          map.current.easeTo({ center: [newLoc.lng, newLoc.lat], duration: 1000 });
         }
       },
       (err) => alert("GPS error: " + err.message),
@@ -76,11 +76,11 @@ export default function DriverContent() {
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      {/* MAP CONTAINER — FULL HEIGHT, VISIBLE WHEN TRACKING */}
-      <div className="flex-1 w-full bg-gray-800 relative" style={{ height: "100vh" }}>  // ← THIS WAS MISSING — FORCES FULL HEIGHT
-        <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+      {/* MAP CONTAINER — ALWAYS THERE, FULL HEIGHT */}
+      <div className="flex-1 w-full bg-gray-800 relative">
+        <div ref={mapContainer} className="absolute inset-0" style={{ height: '100%', width: '100%' }} />  // ← FULL SIZING
         {!tracking && (
-          <p className="absolute inset-0 flex items-center justify-center text-4xl text-gray-400">
+          <p className="absolute inset-0 flex items-center justify-center text-4xl text-gray-400 z-10">
             Ready to start tracking
           </p>
         )}
@@ -98,7 +98,7 @@ export default function DriverContent() {
         </button>
       </div>
 
-      {/* COORDINATES */}
+      {/* COORDINATES OVERLAY */}
       {tracking && location && (
         <p className="text-center text-xl text-cyan-400 mb-4">
           {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
