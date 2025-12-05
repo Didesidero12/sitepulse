@@ -1,4 +1,4 @@
-// app/tracking/page.tsx
+// app/driver/DriverContent.tsx
 "use client";
 
 import { useSearchParams } from 'next/navigation';
@@ -10,25 +10,24 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
-export default function TrackingPage() {
+export default function DriverContent() {
   const searchParams = useSearchParams();
   const ticketId = searchParams.get('ticketId');
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<any>(null);
-
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
 
-  // INIT MAP (STEP 1: BLANK BOX)
+  // Init map
   useEffect(() => {
     if (!mapContainer.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [ -122.6765, 45.5231 ], // fallback to site location
-      zoom: 14,
+      center: [ -122.6765, 45.5231 ], // fallback to site
+      zoom: 15,
     });
 
     return () => {
@@ -36,7 +35,7 @@ export default function TrackingPage() {
     };
   }, []);
 
-  // START TRACKING + UPDATE MAP (STEP 2: COORDS + MARKER)
+  // START TRACKING + UPDATE MAP
   useEffect(() => {
     if (!tracking || !ticketId) return;
 
@@ -50,7 +49,7 @@ export default function TrackingPage() {
           lastUpdate: serverTimestamp(),
         });
 
-        // STEP 3: UPDATE MARKER + CENTER
+        // UPDATE MARKER
         if (map.current) {
           if (marker.current) {
             marker.current.setLngLat([newLoc.lng, newLoc.lat]);
@@ -59,7 +58,7 @@ export default function TrackingPage() {
               .setLngLat([newLoc.lng, newLoc.lat])
               .addTo(map.current);
           }
-          map.current.easeTo({ center: [newLoc.lng, newLoc.lat], duration: 1000 });
+          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
         }
       },
       (err) => alert("GPS error: " + err.message),
@@ -71,15 +70,17 @@ export default function TrackingPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      {/* HEADER */}
       <div className="bg-cyan-600 p-6 text-center">
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      {/* STEP 4: MAP CONTAINER WITH FULL HEIGHT */}
-      <div className="flex-1 w-full relative">
-        <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+      {/* MAP */}
+      <div className="flex-1 relative">
+        <div ref={mapContainer} className="absolute inset-0" />
       </div>
 
+      {/* BUTTON */}
       <div className="p-6">
         <button
           onClick={() => setTracking(!tracking)}
@@ -91,9 +92,9 @@ export default function TrackingPage() {
         </button>
       </div>
 
-      {/* COORDINATES AS BONUS */}
+      {/* COORDINATES */}
       {tracking && location && (
-        <p className="text-center text-xl text-cyan-300 mb-4">
+        <p className="text-center text-xl text-cyan-400 mb-4">
           {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
         </p>
       )}
