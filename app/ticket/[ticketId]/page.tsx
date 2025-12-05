@@ -120,7 +120,7 @@ export default function ClaimTicket() {
           <div ref={mapContainer} className="absolute inset-0" />
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center bg-gray-800">
           <p className="text-4xl text-gray-400">Ready to start tracking</p>
         </div>
       )}
@@ -129,13 +129,13 @@ export default function ClaimTicket() {
       {!claimed ? (
         <div className="p-8">
           <h1 className="text-6xl font-bold mb-10 text-center">CLAIM THIS DELIVERY</h1>
-          <div className="bg-gray-800 p-12 rounded-3xl text-center">
+          <div className="bg-gray-800 p-12 rounded-3xl text-center max-w-2xl mx-auto">
             <p className="text-5xl font-bold mb-6">{ticket.material}</p>
             <p className="text-4xl mb-10">{ticket.qty}</p>
             {ticket.needsForklift && <p className="text-red-400 text-3xl font-bold mb-10">FORKLIFT NEEDED</p>}
             <button
               onClick={claimAndTrack}
-              className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-12 px-32 rounded-3xl"
+              className="bg-green-600 hover:bg-green-700 text-white text-5xl font-bold py-12 px-32 rounded-3xl shadow-2xl transition-all hover:scale-105"
             >
               CLAIM & START TRACKING
             </button>
@@ -151,12 +151,12 @@ export default function ClaimTicket() {
           )}
           <button
             onClick={() => setTracking(false)}
-            className="bg-red-600 hover:bg-red-700 text-white text-white text-4xl font-bold py-8 px-20 rounded-3xl"
+            className="bg-red-600 hover:bg-red-700 text-white text-4xl font-bold py-8 px-20 rounded-3xl"
           >
             STOP TRACKING
           </button>
         </div>
-      )}   {/* ← THIS ) CLOSES THE TERNARY */}
+      )}
     </div>
-  );     {/* ← THIS ); CLOSES THE return */}
+  );
 }
