@@ -46,7 +46,6 @@ export default function DriverContent() {
           lastUpdate: serverTimestamp(),
         });
 
-        // Update map marker
         if (map.current) {
           if (marker.current) {
             marker.current.setLngLat([newLoc.lng, newLoc.lat]);
