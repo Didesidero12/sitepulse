@@ -88,126 +88,142 @@ export default function DriverContent() {
           </Marker>
         </Map>
   
-        <Sheet
-          ref={sheetRef}
-          isOpen={true}
-          onClose={() => {}}
-          snapPoints={[0.6, 0.15]}
-          initialSnap={1}
-          onSnap={(index) => setSheetSnap(index)}
-          disableDismiss={true}
-        >
-          <Sheet.Container>
-            <Sheet.Header />
-            <Sheet.Content>
-              <div style={{ padding: '16px', paddingTop: 0 }}>
-                <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                  <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
+<Sheet
+  ref={sheetRef}
+  isOpen={true}
+  onClose={() => {}}
+  snapPoints={[0.6, 0.15]}
+  initialSnap={1}
+  onSnap={(index) => setSheetSnap(index)}
+  disableDismiss={true}
+  disableDrag={tracking}  // ← KEY: Disable drag while tracking → map gets touch events
+>
+  <Sheet.Container>
+    <Sheet.Header />
+    <Sheet.Content>
+      <div style={{ padding: '16px', paddingTop: 0 }}>
+        {/* Drag Handle - Always Visible */}
+        <div style={{ textAlign: 'center', padding: '8px 0' }}>
+          <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
+        </div>
+
+        {/* Live ETA Row - Always Visible in Peek When Tracking */}
+        {tracking && (
+          <div style={{
+            background: '#ecfdf5',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '16px',
+            border: '1px solid #86efac',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>-- min</p>
+              <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>-- mi • --:-- AM</p>
+            </div>
+            <button
+              onClick={() => setTracking(false)}
+              style={{
+                padding: '10px 20px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: 'white',
+                background: '#dc2626',
+                border: 'none',
+                borderRadius: '20px',
+              }}
+            >
+              Stop
+            </button>
+          </div>
+        )}
+
+        {/* Pre-Tracking Content - Only Visible When Not Tracking */}
+        {!tracking && (
+          <>
+            <h2 style={{ margin: '8px 0 4px', fontSize: '18px', fontWeight: 'bold' }}>Driver Navigation</h2>
+            <p style={{ color: '#666', margin: '0 0 16px', fontSize: '14px' }}>
+              Tap below to begin tracking and navigation
+            </p>
+
+            {/* Trip Summary Card (Pre-Tracking) */}
+            <div style={{
+              background: '#f3f4f6',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>-- min</p>
+                  <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>-- mi • --:-- AM</p>
                 </div>
-  
-                <h2 style={{ margin: '8px 0 4px', fontSize: '18px', fontWeight: 'bold' }}>Driver Navigation</h2>
-                <p style={{ color: '#666', margin: '0 0 16px', fontSize: '14px' }}>
-                  {tracking 
-                    ? '🔵 Live tracking active • Tap to view details' 
-                    : 'Tap below to begin tracking and navigation'}
-                </p>
-  
-                <div style={{
-                  background: tracking ? '#ecfdf5' : '#f3f4f6',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  marginBottom: '16px',
-                  border: tracking ? '1px solid #86efac' : 'none'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>-- min</p>
-                      <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>-- mi • --:-- AM</p>
-                    </div>
-  
-                    {tracking ? (
-                      <button
-                        onClick={() => setTracking(false)}
-                        style={{
-                          padding: '10px 20px',
-                          fontSize: '16px',
-                          fontWeight: 'bold',
-                          color: 'white',
-                          background: '#dc2626',
-                          border: 'none',
-                          borderRadius: '20px',
-                        }}
-                      >
-                        Stop
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => claimed ? setTracking(true) : null}
-                        disabled={!claimed}
-                        style={{
-                          padding: '10px 20px',
-                          fontSize: '16px',
-                          fontWeight: 'bold',
-                          color: 'white',
-                          background: claimed ? '#16a34a' : '#d1d5db',
-                          border: 'none',
-                          borderRadius: '20px',
-                          cursor: claimed ? 'pointer' : 'not-allowed',
-                        }}
-                      >
-                        Start
-                      </button>
-                    )}
-                  </div>
-                </div>
-  
-                <div style={{
-                  background: '#f3f4f6',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  marginBottom: '16px',
-                  fontSize: '14px',
-                  color: '#333',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div>
-                    <p style={{ margin: '0 0 4px' }}><strong>Materials:</strong> Doors from Italy (12 bifolds)</p>
-                    <p style={{ margin: '0' }}><strong>Forklift Needed:</strong> Yes</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setClaimed(true);
-                      alert('Ticket claimed! Start button enabled.');
-                    }}
-                    disabled={claimed}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      color: 'white',
-                      background: claimed ? '#d1d5db' : '#3b82f6',
-                      border: 'none',
-                      borderRadius: '20px',
-                      cursor: claimed ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {claimed ? 'Claimed' : 'Claim Delivery'}
-                  </button>
-                </div>
-  
-                {tracking && position && sheetSnap === 0 && (
-                  <div style={{ marginTop: '16px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                    Lat: {position.lat.toFixed(6)} • Lng: {position.lng.toFixed(6)}
-                  </div>
-                )}
+                <button
+                  onClick={() => claimed ? setTracking(true) : null}
+                  disabled={!claimed}
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    background: claimed ? '#16a34a' : '#d1d5db',
+                    border: 'none',
+                    borderRadius: '20px',
+                  }}
+                >
+                  Start
+                </button>
               </div>
-            </Sheet.Content>
-          </Sheet.Container>
-  
-          <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
-        </Sheet>
+            </div>
+
+            {/* Ticket Summary + Claim Button */}
+            <div style={{
+              background: '#f3f4f6',
+              borderRadius: '12px',
+              padding: '12px',
+              fontSize: '14px',
+              color: '#333',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <p style={{ margin: '0 0 4px' }}><strong>Materials:</strong> Doors from Italy (12 bifolds)</p>
+                <p style={{ margin: '0' }}><strong>Forklift Needed:</strong> Yes</p>
+              </div>
+              <button
+                onClick={() => setClaimed(true)}
+                disabled={claimed}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: 'white',
+                  background: claimed ? '#d1d5db' : '#3b82f6',
+                  border: 'none',
+                  borderRadius: '20px',
+                }}
+              >
+                {claimed ? 'Claimed' : 'Claim Delivery'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Expanded-Only Content */}
+        {sheetSnap === 0 && tracking && position && (
+          <div style={{ marginTop: '16px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
+            Lat: {position.lat.toFixed(6)} • Lng: {position.lng.toFixed(6)}
+          </div>
+        )}
+      </div>
+    </Sheet.Content>
+  </Sheet.Container>
+
+  <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
+</Sheet>
   
         <style jsx>{`
           @keyframes pulse {
