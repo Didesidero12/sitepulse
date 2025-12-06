@@ -96,7 +96,7 @@ export default function DriverContent() {
   initialSnap={1}
   onSnap={(index) => setSheetSnap(index)}
   disableDismiss={true}
-  disableDrag={tracking}  // Map gets touch priority
+  disableDrag={false}  // or remove the prop entirely
 >
   <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
