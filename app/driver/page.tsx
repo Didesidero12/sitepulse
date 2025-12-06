@@ -22,7 +22,6 @@ export default function DriverPage() {
           };
           setPosition(newPos);
 
-          // Smoothly fly to driver's location
           if (mapRef.current) {
             mapRef.current.flyTo({
               center: [newPos.lng, newPos.lat],
@@ -46,6 +45,13 @@ export default function DriverPage() {
       return () => {
         navigator.geolocation.clearWatch(watchId);
       };
+    }
+  }, [tracking]);
+
+  // ← ADD THIS NEW EFFECT RIGHT HERE
+  useEffect(() => {
+    if (tracking && sheetRef.current) {
+      sheetRef.current.snapTo(1);
     }
   }, [tracking]);
 
