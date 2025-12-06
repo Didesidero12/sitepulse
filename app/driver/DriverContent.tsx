@@ -92,35 +92,37 @@ export default function DriverContent() {
   ref={sheetRef}
   isOpen={true}
   onClose={() => {}}
-  snapPoints={[0.6, 0.15]}
+  snapPoints={[0.6, 0.12]}  // ← Reduced for more map space
   initialSnap={1}
   onSnap={(index) => setSheetSnap(index)}
   disableDismiss={true}
-  disableDrag={tracking}  // ← KEY: Disable drag while tracking → map gets touch events
+  disableDrag={tracking}  // Map gets touch priority
 >
   <Sheet.Container>
-    <Sheet.Header />
+    {/* REMOVE <Sheet.Header /> completely — no extra line */}
+
     <Sheet.Content>
-      <div style={{ padding: '16px', paddingTop: 0 }}>
-        {/* Drag Handle - Always Visible */}
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
+      <div style={{ padding: '12px', paddingTop: 8 }}>  {/* Tighter padding */}
+
+        {/* Drag Handle - Always First & Visible */}
+        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
           <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
         </div>
 
-        {/* Live ETA Row - Always Visible in Peek When Tracking */}
+        {/* Live ETA Row - Only When Tracking (This is the ONLY thing in peek) */}
         {tracking && (
           <div style={{
             background: '#ecfdf5',
             borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '16px',
+            padding: '14px',  // Slightly tighter
             border: '1px solid #86efac',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            marginBottom: 0  // No extra margin
           }}>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>-- min</p>
+              <p style={{ fontSize: '26px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>-- min</p>
               <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>-- mi • --:-- AM</p>
             </div>
             <button
