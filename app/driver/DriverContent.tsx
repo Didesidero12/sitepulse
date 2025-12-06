@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from 'next/navigation';
 import { useRef, useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -14,10 +15,10 @@ export default function DriverContent() {
   const mapRef = useRef<any>(null);
 
   // Parse URL params (now safe inside client component)
-  const url = new URL(window.location.href);
-  const destLat = parseFloat(url.searchParams.get('destLat') || '37.7749');
-  const destLng = parseFloat(url.searchParams.get('destLng') || '-122.4194');
-  const destination = { lat: destLat, lng: destLng };
+    const searchParams = useSearchParams();
+    const destLat = parseFloat(searchParams.get('destLat') || '37.7749');
+    const destLng = parseFloat(searchParams.get('destLng') || '-122.4194');
+    const destination = { lat: destLat, lng: destLng };
 
   useEffect(() => {
     if (tracking) {
@@ -46,58 +47,98 @@ export default function DriverContent() {
     }
   }, [tracking]);
 
-  return (
-      <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-        <Map
-          ref={mapRef}
-          initialViewState={{
-            latitude: destination.lat,
-            longitude: destination.lng,
-            zoom: 12,
+return (
+  <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+    {/* Full-screen Map */}
+    <Map
+      ref={mapRef}
+      initialViewState={{
+        latitude: destination.lat,
+        longitude: destination.lng,
+        zoom: 12,
+      }}
+      style={{ width: '100%', height: '100%' }}
+      mapStyle="mapbox://styles/mapbox/streets-v12"
+      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+    >
+      {/* Cyan Dot Marker */}
+      {tracking && position && (
+        <Marker longitude={position.lng} latitude={position.lat}>
+          <div
+            style={{
+              width: '28px',
+              height: '28px',
+              background: 'cyan',
+              border: '4px solid white',
+              borderRadius: '50%',
+              boxShadow: '0 0 20px rgba(0, 255, 255, 0.8)',
+              animation: 'pulse 2s infinite',
+            }}
+          />
+        </Marker>
+      )}
+      {/* Red Destination Pin */}
+      <Marker longitude={destination.lng} latitude={destination.lat}>
+        <div
+          style={{
+            width: '24px',
+            height: '24px',
+            background: 'red',
+            border: '4px solid white',
+            borderRadius: '50%',
+            boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
           }}
-          style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/streets-v12"
-          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-        >
-          {tracking && position && (
-            <Marker longitude={position.lng} latitude={position.lat}>
-              <div
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  background: 'cyan',
-                  border: '4px solid white',
-                  borderRadius: '50%',
-                  boxShadow: '0 0 20px rgba(0, 255, 255, 0.8)',
-                  animation: 'pulse 2s infinite',
-                }}
-              />
-            </Marker>
-          )}
-          <Marker longitude={destination.lng} latitude={destination.lat}>
-            <div
-              style={{
-                width: '24px',
-                height: '24px',
-                background: 'red',
-                border: '4px solid white',
-                borderRadius: '50%',
-                boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
-              }}
-            />
-          </Marker>
-        </Map>
-  
-<Sheet
-  ref={sheetRef}
-  isOpen={true}
-  onClose={() => {}}
-  snapPoints={[0.6, 0.12]}  // ← Reduced for more map space
-  initialSnap={1}
-  onSnap={(index) => setSheetSnap(index)}
-  disableDismiss={true}
-  disableDrag={false}  // or remove the prop entirely
->
+        />
+      </Marker>
+    </Map>
+
+    {/* Re-Center Button - Overlaid on Map */}
+    {tracking && position && (
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '220px',
+          right: '16px',
+          background: 'white',
+          borderRadius: '50%',
+          width: '56px',
+          height: '56px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          zIndex: 1000,
+          border: '2px solid #ddd',
+        }}
+        onClick={() => {
+          if (mapRef.current && position) {
+            mapRef.current.flyTo({
+              center: [position.lng, position.lat],
+              zoom: 16,
+              duration: 1500,
+            });
+          }
+        }}
+      >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v8" />
+          <path d="M8 12h8" />
+        </svg>
+      </div>
+    )}
+
+    {/* Bottom Sheet */}
+    <Sheet
+      ref={sheetRef}
+      isOpen={true}
+      onClose={() => {}}
+      snapPoints={[0.6, 0.15]}
+      initialSnap={1}
+      onSnap={(index) => setSheetSnap(index)}
+      disableDismiss={true}
+      disableDrag={false}
+    >
   <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
 
@@ -227,13 +268,27 @@ export default function DriverContent() {
   <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
 </Sheet>
   
+    {/* Global Style for Touch Pass-Through */}
+        <style jsx global>{`
+        .react-modal-sheet-backdrop {
+            pointer-events: none !important;
+        }
+        .react-modal-sheet-container {
+            pointer-events: none !important;
+        }
+        .react-modal-sheet-content > div {
+            pointer-events: auto !important;
+        }
+        `}</style>
+
+        {/* Pulse Animation */}
         <style jsx>{`
-          @keyframes pulse {
+        @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
-          }
+        }
         `}</style>
-      </div>
+    </div>
     );
   }
