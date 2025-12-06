@@ -1,4 +1,4 @@
-// app/driver/DriverContent.tsx
+// app/tracking/page.tsx
 "use client";
 
 import { useSearchParams } from 'next/navigation';
@@ -10,7 +10,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
-export default function DriverContent() {
+export default function TrackingPage() {
   const searchParams = useSearchParams();
   const ticketId = searchParams.get('ticketId');
   const [tracking, setTracking] = useState(false);
@@ -20,7 +20,7 @@ export default function DriverContent() {
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
 
-  // INIT MAP UPFRONT (WAITING STATE)
+  // INIT MAP
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -36,7 +36,7 @@ export default function DriverContent() {
     };
   }, []);
 
-  // START TRACKING + UPDATE MARKER
+  // START TRACKING + UPDATE MAP
   useEffect(() => {
     if (!tracking || !ticketId) return;
 
@@ -50,7 +50,7 @@ export default function DriverContent() {
           lastUpdate: serverTimestamp(),
         });
 
-        // UPDATE MARKER ON MAP
+        // UPDATE MARKER
         if (map.current) {
           if (marker.current) {
             marker.current.setLngLat([newLoc.lng, newLoc.lat]);
@@ -59,7 +59,7 @@ export default function DriverContent() {
               .setLngLat([newLoc.lng, newLoc.lat])
               .addTo(map.current);
           }
-          map.current.easeTo({ center: [newLoc.lng, newLoc.lat], duration: 1000 });
+          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
         }
       },
       (err) => alert("GPS error: " + err.message),
@@ -76,14 +76,9 @@ export default function DriverContent() {
         <h1 className="text-5xl font-black">DRIVER MODE</h1>
       </div>
 
-      {/* MAP CONTAINER — ALWAYS THERE, FULL HEIGHT */}
-      <div className="flex-1 w-full bg-gray-800 relative">
-        <div ref={mapContainer} className="absolute inset-0" style={{ height: '100%', width: '100%' }} />  // ← FULL SIZING
-        {!tracking && (
-          <p className="absolute inset-0 flex items-center justify-center text-4xl text-gray-400 z-10">
-            Ready to start tracking
-          </p>
-        )}
+      {/* MAP CONTAINER */}
+      <div className="flex-1 relative">
+        <div ref={mapContainer} className="absolute inset-0" />
       </div>
 
       {/* BUTTON */}
@@ -98,7 +93,7 @@ export default function DriverContent() {
         </button>
       </div>
 
-      {/* COORDINATES OVERLAY */}
+      {/* COORDINATES */}
       {tracking && location && (
         <p className="text-center text-xl text-cyan-400 mb-4">
           {location.lat.toFixed(6)}, {location.lng.toFixed(6)}

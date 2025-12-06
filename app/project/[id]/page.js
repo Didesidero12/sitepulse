@@ -19,7 +19,10 @@ export default function ProjectHome() {
         <Link href={`/project/${id}/sub`} className="bg-orange-600 hover:bg-orange-500 p-16 rounded-3xl text-5xl font-bold shadow-2xl">
           Subcontractor
         </Link>
-        <Link href={`/project/${id}/driver`} className="bg-green-600 hover:bg-green-500 p-16 rounded-3xl text-5xl font-bold shadow-2xl">
+        <Link 
+          href="/driver"  // ← Direct to root driver page
+          className="bg-green-600 hover:bg-green-500 p-16 rounded-3xl text-5xl font-bold shadow-2xl"
+        >
           Driver
         </Link>
       </div>

@@ -1,7 +1,4 @@
-// GOLDEN DRIVER PAGE — DO NOT TOUCH — THIS ONE WORKS 100%
-// Saved on 2025-04-05 — the day we finally beat the map
-// Map is idle, button works, dot moves, no errors
-
+// app/test-driver/page.tsx (or your driver page)
 "use client";
 
 import { useSearchParams } from 'next/navigation';
@@ -10,6 +7,8 @@ import { db } from '@/app/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { FaPlay, FaStop } from 'react-icons/fa';
+
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
 export default function TestDriverPage() {
@@ -59,7 +58,17 @@ export default function TestDriverPage() {
           lastUpdate: serverTimestamp(),
         });
 
-        // MARKER UPDATE MOVED TO SEPARATE useEffect BELOW
+        // MARKER UPDATE
+        if (map.current) {
+          if (marker.current) {
+            marker.current.setLngLat([newLoc.lng, newLoc.lat]);
+          } else {
+            marker.current = new mapboxgl.Marker({ color: "cyan" })
+              .setLngLat([newLoc.lng, newLoc.lat])
+              .addTo(map.current);
+          }
+          map.current.easeTo({ center: [newLoc.lng, newLoc.lat] });
+        }
       },
       (err) => alert("GPS error: " + err.message),
       { enableHighAccuracy: true }
@@ -68,54 +77,46 @@ export default function TestDriverPage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, ticketId]);
 
-  // MARKER UPDATE — SEPARATE, CLEAN, BULLETPROOF
-  useEffect(() => {
-    if (!location || !map.current) return;
-
-    if (marker.current) {
-      marker.current.setLngLat([location.lng, location.lat]);
-    } else {
-      marker.current = new mapboxgl.Marker({ color: "cyan" })
-        .setLngLat([location.lng, location.lat])
-        .addTo(map.current);
-    }
-
-    map.current.easeTo({ center: [location.lng, location.lat], duration: 1000 });
-  }, [location]);
-
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <div className="bg-cyan-600 p-6 text-center">
-        <h1 className="text-5xl font-black">DRIVER MODE</h1>
-      </div>
+    <div className="relative h-screen w-screen bg-gray-900 overflow-hidden">
+      {/* MAP — FULL SCREEN, BEHIND EVERYTHING */}
+      <div 
+        ref={mapContainer} 
+        className="absolute inset-0 w-full h-full"
+        style={{ height: '100vh' }}
+      />
 
-      {/* MAP CONTAINER — FULL HEIGHT, VISIBLE */}
-      <div className="flex-1 relative">
-        <div ref={mapContainer} className="absolute inset-0" style={{ height: '100vh', width: '100%' }} />
-        {!tracking && (
-          <p className="absolute inset-0 flex items-center justify-center text-4xl text-gray-400 z-10">
-            Ready to start tracking
-          </p>
-        )}
-      </div>
+      {/* SLIDER — FLOATING ON TOP */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gray-900 rounded-t-3xl shadow-2xl z-50">
+        <div className="w-12 h-1.5 bg-gray-600 rounded-full mx-auto mt-4 mb-6" />
 
-      <div className="p-6">
-        <button
-          onClick={() => setTracking(!tracking)}
-          className={`w-full py-12 text-5xl sm:text-6xl font-bold rounded-3xl transition-all ${
-            tracking ? "bg-red-600 hover:bg-red-700" : "bg-cyan-600 hover:bg-cyan-700"
-          }`}
-        >
-          {tracking ? "STOP TRACKING" : "START TRACKING NOW"}
-        </button>
-      </div>
+        <div className="px-6 pb-10">
+          <button
+            onClick={() => setTracking(!tracking)}
+            className={`w-full py-20 text-7xl font-black rounded-3xl transition-all active:scale-95 shadow-2xl flex items-center justify-center gap-10 ${
+              tracking ? "bg-red-600 hover:bg-red-700" : "bg-cyan-600 hover:bg-cyan-700"
+            }`}
+          >
+            {tracking ? (
+              <>
+                <FaStop size={130} />
+                <span>STOP TRACKING</span>
+              </>
+            ) : (
+              <>
+                <FaPlay size={130} />
+                <span>START TRACKING NOW</span>
+              </>
+            )}
+          </button>
 
-      {/* COORDINATES */}
-      {tracking && location && (
-        <p className="text-center text-xl text-cyan-400 mb-4">
-          {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-        </p>
-      )}
+          {tracking && location && (
+            <p className="text-center text-xl text-cyan-400 mt-8">
+              {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
