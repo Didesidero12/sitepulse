@@ -4,11 +4,18 @@ import { useRef, useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
+import { useSearchParams } from 'next/navigation';
 
 export default function DriverPage() {
-  const [sheetSnap, setSheetSnap] = useState(1); // 0 = expanded, 1 = minimized
+  const searchParams = useSearchParams();
+  const destLat = parseFloat(searchParams.get('destLat') || '37.7749');
+  const destLng = parseFloat(searchParams.get('destLng') || '-122.4194');
+  const destination = { lat: destLat, lng: destLng };
+
+  const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [claimed, setClaimed] = useState(false); // ← ADD THIS LINE HERE (right after other states)
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
@@ -16,18 +23,10 @@ export default function DriverPage() {
     if (tracking) {
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          const newPos = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          };
+          const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setPosition(newPos);
-
           if (mapRef.current) {
-            mapRef.current.flyTo({
-              center: [newPos.lng, newPos.lat],
-              zoom: 16,
-              duration: 2000,
-            });
+            mapRef.current.flyTo({ center: [newPos.lng, newPos.lat], zoom: 16, duration: 2000 });
           }
         },
         (err) => {
@@ -35,20 +34,12 @@ export default function DriverPage() {
           alert("Location access denied or unavailable");
           setTracking(false);
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0,
-        }
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
-
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-      };
+      return () => navigator.geolocation.clearWatch(watchId);
     }
   }, [tracking]);
 
-  // ← ADD THIS NEW EFFECT RIGHT HERE
   useEffect(() => {
     if (tracking && sheetRef.current) {
       sheetRef.current.snapTo(1);
@@ -57,19 +48,17 @@ export default function DriverPage() {
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      {/* Full-screen Map */}
       <Map
         ref={mapRef}
         initialViewState={{
-          latitude: 37.7749,
-          longitude: -122.4194,
+          latitude: destination.lat,
+          longitude: destination.lng,
           zoom: 12,
         }}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
       >
-        {/* Cyan Dot Marker */}
         {tracking && position && (
           <Marker longitude={position.lng} latitude={position.lat}>
             <div
@@ -85,9 +74,20 @@ export default function DriverPage() {
             />
           </Marker>
         )}
+        <Marker longitude={destination.lng} latitude={destination.lat}>
+          <div
+            style={{
+              width: '24px',
+              height: '24px',
+              background: 'red',
+              border: '4px solid white',
+              borderRadius: '50%',
+              boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
+            }}
+          />
+        </Marker>
       </Map>
 
-      {/* Bottom Sheet */}
       <Sheet
         ref={sheetRef}
         isOpen={true}
@@ -101,49 +101,103 @@ export default function DriverPage() {
           <Sheet.Header />
           <Sheet.Content>
             <div style={{ padding: '16px', paddingTop: 0 }}>
-              {/* Drag Handle */}
               <div style={{ textAlign: 'center', padding: '8px 0' }}>
                 <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
               </div>
 
               <h2 style={{ margin: '8px 0 4px', fontSize: '18px', fontWeight: 'bold' }}>Driver Navigation</h2>
               <p style={{ color: '#666', margin: '0 0 16px', fontSize: '14px' }}>
-                {tracking ? 'Tracking active • Sharing location' : 'Tap below to begin tracking and navigation'}
+                {tracking 
+                  ? '🔵 Live tracking active • Tap to view details' 
+                  : 'Tap below to begin tracking and navigation'}
               </p>
 
-              {/* Trip Summary Placeholder */}
+              <div style={{
+                background: tracking ? '#ecfdf5' : '#f3f4f6',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '16px',
+                border: tracking ? '1px solid #86efac' : 'none'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>-- min</p>
+                    <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>-- mi • --:-- AM</p>
+                  </div>
+
+                  {tracking ? (
+                    <button
+                      onClick={() => setTracking(false)}
+                      style={{
+                        padding: '10px 20px',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        background: '#dc2626',
+                        border: 'none',
+                        borderRadius: '20px',
+                      }}
+                    >
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => claimed ? setTracking(true) : null}
+                      disabled={!claimed}
+                      style={{
+                        padding: '10px 20px',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        background: claimed ? '#16a34a' : '#d1d5db',
+                        border: 'none',
+                        borderRadius: '20px',
+                        cursor: claimed ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      Start
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div style={{
                 background: '#f3f4f6',
                 borderRadius: '12px',
-                padding: '16px',
-                textAlign: 'center',
-                marginBottom: '16px'
+                padding: '12px',
+                marginBottom: '16px',
+                fontSize: '14px',
+                color: '#333',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
               }}>
-                <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Trip summary will appear here</p>
-                <p style={{ margin: '8px 0 0', fontSize: '20px', fontWeight: 'bold', color: '#333' }}>
-                  — ETA • — mi
-                </p>
+                <div>
+                  <p style={{ margin: '0 0 4px' }}><strong>Materials:</strong> Doors from Italy (12 bifolds)</p>
+                  <p style={{ margin: '0' }}><strong>Forklift Needed:</strong> Yes</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setClaimed(true);
+                    alert('Ticket claimed! Start button enabled.');
+                  }}
+                  disabled={claimed}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    background: claimed ? '#d1d5db' : '#3b82f6',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: claimed ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {claimed ? 'Claimed' : 'Claim Delivery'}
+                </button>
               </div>
 
-              {/* Start/Stop Button */}
-              <button
-                onClick={() => setTracking(!tracking)}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  color: 'white',
-                  background: tracking ? '#dc2626' : '#16a34a',
-                  border: 'none',
-                  borderRadius: '12px',
-                }}
-              >
-                {tracking ? 'STOP TRACKING' : 'START TRACKING NOW'}
-              </button>
-
-              {/* Optional: Show current coords while tracking */}
-              {tracking && position && (
+              {tracking && position && sheetSnap === 0 && (
                 <div style={{ marginTop: '16px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
                   Lat: {position.lat.toFixed(6)} • Lng: {position.lng.toFixed(6)}
                 </div>
@@ -155,7 +209,6 @@ export default function DriverPage() {
         <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
       </Sheet>
 
-      {/* Optional: Pulse animation for cyan dot */}
       <style jsx>{`
         @keyframes pulse {
           0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
