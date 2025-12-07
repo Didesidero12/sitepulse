@@ -453,18 +453,27 @@ return (
             Lat: {position.lat.toFixed(6)} • Lng: {position.lng.toFixed(6)}
           </div>
         )}
-        {/* ADD FULL TURN-BY-TURN LIST HERE */}
+        {/* Full Turn-by-Turn List - Only When Sheet Expanded */}
         {sheetSnap === 0 && instructions.length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold' }}>Turn-by-Turn Directions</h3>
-            <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '15px', lineHeight: '1.5' }}>
-              {instructions.map((inst, i) => (
-                <li key={i} style={{ marginBottom: '8px', color: i === 0 ? '#2563eb' : '#333', fontWeight: i === 0 ? 'bold' : 'normal' }}>
-                  {inst}
+        <div style={{ marginTop: '20px', padding: '0 4px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold' }}>
+            Turn-by-Turn Directions
+            </h3>
+            <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '15px', lineHeight: '1.6' }}>
+            {instructions.map((inst, i) => (
+                <li
+                key={i}
+                style={{
+                    marginBottom: '10px',
+                    color: i === 0 ? '#2563eb' : '#333',
+                    fontWeight: i === 0 ? 'bold' : 'normal',
+                }}
+                >
+                {inst}
                 </li>
-              ))}
+            ))}
             </ol>
-          </div>
+        </div>
         )}
       </div>
     </Sheet.Content>
