@@ -22,6 +22,8 @@ export default function DriverContent() {
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
   const [arrived, setArrived] = useState(false);
+  const [instructions, setInstructions] = useState<string[]>([]);
+  const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
@@ -274,8 +276,8 @@ return (
     padding: '14px',
     border: '1px solid #86efac',
     display: 'flex',
-    flexDirection: 'column',  // Changed to column to stack ETA + warning + button
-    gap: '12px',  // Clean spacing
+    flexDirection: 'column',
+    gap: '12px',
   }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <div style={{ flex: 1 }}>
@@ -285,6 +287,13 @@ return (
         <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
           {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
         </p>
+
+        {/* ← ADD NEXT TURN PREVIEW HERE */}
+        {instructions.length > 0 && (
+          <p style={{ fontSize: '15px', color: '#333', margin: '8px 0 0', fontWeight: '500', lineHeight: '1.3' }}>
+            ➤ {nextInstruction}
+          </p>
+        )}
       </div>
 
       {/* Conditional Button: I've Arrived or Stop */}
@@ -430,6 +439,19 @@ return (
         {sheetSnap === 0 && tracking && position && (
           <div style={{ marginTop: '16px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
             Lat: {position.lat.toFixed(6)} • Lng: {position.lng.toFixed(6)}
+          </div>
+        )}
+        {/* ADD FULL TURN-BY-TURN LIST HERE */}
+        {sheetSnap === 0 && instructions.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold' }}>Turn-by-Turn Directions</h3>
+            <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '15px', lineHeight: '1.5' }}>
+              {instructions.map((inst, i) => (
+                <li key={i} style={{ marginBottom: '8px', color: i === 0 ? '#2563eb' : '#333', fontWeight: i === 0 ? 'bold' : 'normal' }}>
+                  {inst}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
       </div>
