@@ -46,7 +46,7 @@ export default function DriverContent() {
         ],
         geometries: 'geojson',
         overview: 'full',
-        steps: false,
+        steps: true, // ← Updated from false to true
       }).send();
 
       const routeData = response.body.routes[0];
@@ -62,11 +62,23 @@ export default function DriverContent() {
       const now = new Date();
       now.setMinutes(now.getMinutes() + durationMin);
       setArrivalTime(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+
+      // Turn-by-turn instructions
+      if (routeData.legs && routeData.legs[0] && routeData.legs[0].steps) {
+        const steps = routeData.legs[0].steps.map((step: any) => step.maneuver.instruction);
+        setInstructions(steps);
+        setNextInstruction(steps[0] || 'Follow the route');
+      } else {
+        setInstructions([]);
+        setNextInstruction('Follow the route');
+      }
     } catch (err) {
       console.error('Route error:', err);
       setEtaMinutes(null);
       setDistanceMiles(null);
       setArrivalTime('--:-- AM');
+      setInstructions([]);
+      setNextInstruction('Follow the route');
     }
   };
 
