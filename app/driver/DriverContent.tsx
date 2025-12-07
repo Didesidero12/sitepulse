@@ -496,7 +496,9 @@ return (
           ? 'Forklift Alert' 
           : 'Site Assistance Required'}
     </strong>: Heavy machinery active on site — stay vigilant!
-  </div>
+</div>
+    )}
+  </div>  
 )}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
