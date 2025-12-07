@@ -67,6 +67,15 @@ export default function DriverContent() {
     }
   };
 
+  // ← ADD formatDuration HELPER FUNCTION HERE
+  const formatDuration = (minutes: number | null) => {
+    if (minutes === null || minutes === undefined) return '-- min';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours} h ${mins > 0 ? `${mins} min` : ''}`;
+  };
+
     // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
   if (tracking) {
@@ -251,8 +260,8 @@ return (
             marginBottom: 0  // No extra margin
         }}>
             <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '26px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>
-                {etaMinutes !== null ? `${etaMinutes} min` : '-- min'}
+            <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>
+            {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
             </p>
             <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
                 {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
@@ -293,7 +302,7 @@ return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ flex: 1 }}>
             <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
-                {etaMinutes !== null ? `${etaMinutes} min` : '-- min'}
+            {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
             </p>
             <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
                 {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
