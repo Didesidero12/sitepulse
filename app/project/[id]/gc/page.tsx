@@ -21,7 +21,7 @@ export default function SuperWarRoom() {
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-  // LIVE TRUCKS
+// LIVE TRUCKS + GC Milestone Alerts
   useEffect(() => {
     const q = query(
       collection(db, "tickets"),
@@ -33,8 +33,21 @@ export default function SuperWarRoom() {
       const list: any[] = [];
       snap.forEach((doc) => {
         const data = doc.data();
+        const ticketId = doc.id;
+
+        // GC Milestone Alerts
+        if (data.gcNotified30min && !data.gcAlert30minShown) {
+          alert(`Delivery Inbound: 30 min out!\n${data.material || 'Load'} • ${data.qty || ''}`);
+          // Mark as shown to prevent spam
+          updateDoc(doc.ref, { gcAlert30minShown: true });
+        }
+        if (data.gcNotified5min && !data.gcAlert5minShown) {
+          alert(`Delivery Arriving Soon: 5 min out!\n${data.material || 'Load'} • ${data.qty || ''}`);
+          updateDoc(doc.ref, { gcAlert5minShown: true });
+        }
+
         if (data.driverLocation) {
-          list.push({ id: doc.id, ...data });
+          list.push({ id: ticketId, ...data });
         }
       });
       setDeliveries(list);
@@ -152,15 +165,23 @@ export default function SuperWarRoom() {
         </div>
       </div>
 
-      {activeTab === "live" && (
-        <div className="flex-1 p-6">
-          <div
-            ref={mapContainer}
-            className="w-full h-full rounded-2xl bg-gray-800 overflow-hidden"
-            style={{ height: "70vh" }}
-          />
-        </div>
-      )}
+{activeTab === "live" && (
+  <div className="flex-1 p-6 relative">
+    {/* Milestone Banner */}
+    {deliveries.some(d => d.gcNotified30min && !d.gcAlert30minShown) && (
+      <div className="bg-yellow-600 text-white p-4 rounded-lg mb-4 text-center font-bold text-xl">
+        🚛 Delivery 30 min out — Prepare site!
+      </div>
+    )}
+    {deliveries.some(d => d.gcNotified5min && !d.gcAlert5minShown) && (
+      <div className="bg-red-600 text-white p-4 rounded-lg mb-4 text-center font-bold text-xl">
+        🚨 Delivery arriving in 5 min!
+      </div>
+    )}
+
+    <div ref={mapContainer} className="w-full h-full rounded-2xl bg-gray-800 overflow-hidden" style={{ height: "70vh" }} />
+  </div>
+)}
 
       {activeTab === "pending" && (
         <div className="p-6">

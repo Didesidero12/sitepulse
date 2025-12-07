@@ -9,7 +9,7 @@ import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
 import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { db } from '@/lib/firebase.js';
+import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
@@ -22,6 +22,10 @@ export default function DriverContent() {
   const [claimed, setClaimed] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
+  const [destination, setDestination] = useState<{ lat: number; lng: number }>({
+    lat: 46.21667,
+    lng: -119.22323,
+  });
 
   // Route & Guidance State
   const [route, setRoute] = useState<any>(null);
@@ -45,30 +49,7 @@ export default function DriverContent() {
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
-
-// Dynamic destination: 
-// 1. ticket.siteCoords (from Firebase — changes if GC updates)
-// 2. URL params (fallback for testing or no ticket)
-// 3. Kennewick office (hard fallback)
-let destLat = 46.21667;  // Kennewick fallback
-let destLng = -119.22323;
-
-if (ticket?.siteCoords) {
-  // Priority 1: Real-time from ticket (GC can change this mid-route)
-  destLat = ticket.siteCoords.lat;
-  destLng = ticket.siteCoords.lng;
-} else {
-  // Priority 2: URL params (for manual testing or no ticket)
-  const urlLat = searchParams.get('destLat');
-  const urlLng = searchParams.get('destLng');
-  if (urlLat && urlLng) {
-    destLat = parseFloat(urlLat);
-    destLng = parseFloat(urlLng);
-  }
-  // Priority 3: Hard fallback (Kennewick office)
-}
-
-const destination = { lat: destLat, lng: destLng };
+const ticketId = searchParams.get('ticketId');
 
     // ← ADD fetchRoute HERE
   const fetchRoute = async (origin: { lat: number; lng: number }) => {
@@ -120,12 +101,24 @@ const destination = { lat: destLat, lng: destLng };
   };
 
   // Helper Functions (grouped together)
-  const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
+const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
+    const ticketId = searchParams.get('ticketId');
+    if (!ticketId) {
+      console.warn('No ticketId — skipping GC notification');
+      return;
+    }
+
     try {
-      console.log(`GC Notification: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
-      alert(`GC Alert: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
+      await updateDoc(doc(db, 'tickets', ticketId), {
+        [`gcNotified${milestone}`]: true,           // e.g., gcNotified30min: true
+        gcNotifiedAt: serverTimestamp(),
+        lastETAUpdate: serverTimestamp(),
+      });
+      console.log(`GC notified via Firebase: ${milestone} out for ticket ${ticketId}`);
+      // Optional temp driver feedback (remove later)
+      // alert(`GC Alert Sent: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
     } catch (err) {
-      console.error('Notification error:', err);
+      console.error('Failed to send GC notification:', err);
     }
   };
 
@@ -146,6 +139,35 @@ const destination = { lat: destLat, lng: destLng };
     );
     return dist < 75;  // ~75 meters = arrived
     };
+
+    useEffect(() => {
+  const ticketId = searchParams.get('ticketId');
+  if (!ticketId) {
+    setLoadingTicket(false);
+    return;
+  }
+
+  const ticketRef = doc(db, 'tickets', ticketId);
+  const unsubscribe = onSnapshot(
+    ticketRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setTicket(data);
+        console.log('Real ticket loaded:', data); // Debug
+      } else {
+        console.warn('No ticket found with ID:', ticketId);
+      }
+      setLoadingTicket(false);
+    },
+    (error) => {
+      console.error('Error loading ticket:', error);
+      setLoadingTicket(false);
+    }
+  );
+
+  return () => unsubscribe();
+}, [searchParams]);
 
     // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
@@ -206,6 +228,31 @@ useEffect(() => {
 
   return unsubscribe;
 }, [searchParams]);
+
+// Dynamic destination from ticket — supports GC mid-route changes
+useEffect(() => {
+  if (ticket?.siteCoords) {
+    const newDest = {
+      lat: ticket.siteCoords.lat,
+      lng: ticket.siteCoords.lng,
+    };
+
+    // Only update if coords actually changed (prevents unnecessary reroutes)
+    if (
+      destination.lat !== newDest.lat ||
+      destination.lng !== newDest.lng
+    ) {
+      setDestination(newDest);
+
+      // Notify driver if already tracking
+      if (tracking) {
+        alert(
+          `Destination updated by GC!\nNew drop zone received. Route recalculating...`
+        );
+      }
+    }
+  }
+}, [ticket?.siteCoords, tracking]);
 
 useEffect(() => {
   if (tracking && position) {
