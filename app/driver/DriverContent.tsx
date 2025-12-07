@@ -26,6 +26,8 @@ export default function DriverContent() {
   const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
   const [notified30Min, setNotified30Min] = useState(false);
   const [notified5Min, setNotified5Min] = useState(false);
+  const [equipmentNeeded, setEquipmentNeeded] = useState('Forklift'); // Stub
+  const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
@@ -155,8 +157,18 @@ useEffect(() => {
       fetchRoute(position);
 
       // Check arrival
-      if (checkArrival(position)) {
+      if (checkArrival(position) && !arrived) {
         setArrived(true);
+        setShowArrivalConfirm(true);  // ← Trigger confirmation buttons
+
+        // Optional: Auto-stop after 30 seconds if driver doesn't respond
+        setTimeout(() => {
+          if (showArrivalConfirm) {  // Still not confirmed
+            setTracking(false);
+            setShowArrivalConfirm(false);
+            alert('Auto-stopped: You have arrived at the site.');
+          }
+        }, 30000);  // 30 seconds
       }
 
       // ETA Milestone Notifications
@@ -175,6 +187,7 @@ useEffect(() => {
     return () => clearInterval(interval);
   } else {
     setArrived(false);
+    setShowArrivalConfirm(false);  // ← Reset confirmation on stop
     setNotified30Min(false);
     setNotified5Min(false);
   }
@@ -331,8 +344,45 @@ return (
         )}
       </div>
 
-      {/* Conditional Button: I've Arrived or Stop */}
-      {arrived ? (
+      {/* Conditional Button Flow: Confirm / Not Yet, I've Arrived, or Stop */}
+      {showArrivalConfirm ? (
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setTracking(false);
+              setShowArrivalConfirm(false);
+              alert('Arrival confirmed! Ticket delivered.');
+            }}
+            style={{
+              padding: '14px 28px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: 'white',
+              background: '#2563eb',
+              border: 'none',
+              borderRadius: '20px',
+              minWidth: '160px',
+            }}
+          >
+            Confirm Arrival
+          </button>
+          <button
+            onClick={() => setShowArrivalConfirm(false)}
+            style={{
+              padding: '14px 28px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: '#333',
+              background: '#e5e7eb',
+              border: 'none',
+              borderRadius: '20px',
+              minWidth: '120px',
+            }}
+          >
+            Not Yet
+          </button>
+        </div>
+      ) : arrived ? (
         <button
           onClick={() => {
             setTracking(false);
@@ -370,7 +420,7 @@ return (
 
     {/* Forklift / Site Assistance Warning — Only when arrived */}
     {arrived && (
-      <div style={{
+    <div style={{
         background: '#fef9c3',
         padding: '12px',
         borderRadius: '8px',
@@ -379,14 +429,15 @@ return (
         textAlign: 'center',
         fontWeight: 'bold',
         fontSize: '14px',
-      }}>
-        ⚠️ <strong>Forklift Alert:</strong> Heavy machinery active on site — stay vigilant!
-        {/* Future: Dynamic message */}
-        {/* {ticket.equipmentNeeded ? `${ticket.equipmentNeeded} Required` : 'Heavy machinery active — stay vigilant!'} */}
-      </div>
+        marginTop: '12px',
+    }}>
+        ⚠️ <strong>{equipmentNeeded} Alert:</strong> Heavy machinery active — stay vigilant!
+            {/* Future: Dynamic message */}
+            {/* {ticket.equipmentNeeded ? `${ticket.equipmentNeeded} Required` : 'Heavy machinery active — stay vigilant!'} */}
+        </div>
+        )}
+    </div>
     )}
-  </div>
-)}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
         {!tracking && (
