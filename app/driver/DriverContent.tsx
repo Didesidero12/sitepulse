@@ -24,6 +24,8 @@ export default function DriverContent() {
   const [arrived, setArrived] = useState(false);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
+  const [notified30Min, setNotified30Min] = useState(false);
+  const [notified5Min, setNotified5Min] = useState(false);
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
@@ -81,6 +83,16 @@ export default function DriverContent() {
       setNextInstruction('Follow the route');
     }
   };
+    //GC Alerts - 5Min/30Min
+    const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
+        try {
+        console.log(`GC Notification: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
+        alert(`GC Alert: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`); // Temp visible feedback
+        // TODO: Real Firebase update in Brick 9
+        } catch (err) {
+        console.error('Notification error:', err);
+        }
+    };  
 
     // ← ADD formatDuration HELPER FUNCTION HERE
     const formatDuration = (minutes: number | null) => {
@@ -145,14 +157,26 @@ useEffect(() => {
       // Check arrival
       if (checkArrival(position)) {
         setArrived(true);
-        // Optional: auto-stop tracking
-        // setTracking(false);
+      }
+
+      // ETA Milestone Notifications
+      if (etaMinutes !== null) {
+        if (etaMinutes <= 30 && !notified30Min) {
+          sendGCMilestoneNotification('30min');
+          setNotified30Min(true);
+        }
+        if (etaMinutes <= 5 && !notified5Min) {
+          sendGCMilestoneNotification('5min');
+          setNotified5Min(true);
+        }
       }
     }, 15000);
 
     return () => clearInterval(interval);
   } else {
-    setArrived(false);  // Reset on stop
+    setArrived(false);
+    setNotified30Min(false);
+    setNotified5Min(false);
   }
 }, [tracking, position]);
 
