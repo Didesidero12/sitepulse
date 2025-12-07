@@ -5,12 +5,22 @@ import { useRef, useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
+import mbxClient from '@mapbox/mapbox-sdk';
+import directionsClient from '@mapbox/mapbox-sdk/services/directions';
+import * as turf from '@turf/turf';
+import { Source, Layer } from 'react-map-gl/mapbox';
+
+const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
 export default function DriverContent() {
   const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
+  const [route, setRoute] = useState<any>(null);
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
+  const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
+  const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
@@ -20,26 +30,55 @@ export default function DriverContent() {
     const destLng = parseFloat(searchParams.get('destLng') || '-122.4194');
     const destination = { lat: destLat, lng: destLng };
 
-  useEffect(() => {
-    if (tracking) {
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setPosition(newPos);
-          if (mapRef.current) {
-            mapRef.current.flyTo({ center: [newPos.lng, newPos.lat], zoom: 16, duration: 2000 });
-          }
-        },
-        (err) => {
-          console.error("GPS Error:", err);
-          alert("Location access denied or unavailable");
-          setTracking(false);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
-      return () => navigator.geolocation.clearWatch(watchId);
+    // ← ADD fetchRoute HERE
+  const fetchRoute = async (origin: { lat: number; lng: number }) => {
+    if (!destination) return;
+
+    try {
+      const response = await directions.getDirections({
+        profile: 'driving-traffic',
+        waypoints: [
+          { coordinates: [origin.lng, origin.lat] },
+          { coordinates: [destination.lng, destination.lat] },
+        ],
+        geometries: 'geojson',
+        overview: 'full',
+        steps: false,
+      }).send();
+
+      const routeData = response.body.routes[0];
+      setRoute(routeData.geometry);
+
+      const durationMin = Math.round(routeData.duration / 60);
+      const distanceMi = (routeData.distance / 1609.34).toFixed(1);
+
+      setEtaMinutes(durationMin);
+      setDistanceMiles(parseFloat(distanceMi));
+
+      // Arrival time
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + durationMin);
+      setArrivalTime(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+    } catch (err) {
+      console.error('Route error:', err);
+      setEtaMinutes(null);
+      setDistanceMiles(null);
+      setArrivalTime('--:-- AM');
     }
-  }, [tracking]);
+  };
+
+    // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
+    useEffect(() => {
+    if (tracking && position) {
+        fetchRoute(position);
+
+        const interval = setInterval(() => {
+        fetchRoute(position);
+        }, 15000);
+
+        return () => clearInterval(interval);
+    }
+    }, [tracking, position]);
 
   useEffect(() => {
     if (tracking && sheetRef.current) {
@@ -90,7 +129,22 @@ return (
           }}
         />
       </Marker>
-    </Map>
+      
+        {/* ← ADD THE BLUE ROUTE LINE HERE */}
+        {route && (
+            <Source id="route" type="geojson" data={route}>
+            <Layer
+                id="route-line"
+                type="line"
+                paint={{
+                'line-color': '#3887be',
+                'line-width': 6,
+                'line-opacity': 0.8,
+                }}
+            />
+            </Source>
+        )}
+        </Map>
 
     {/* Re-Center Button - Overlaid on Map */}
     {tracking && position && (
