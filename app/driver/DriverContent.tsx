@@ -68,23 +68,57 @@ export default function DriverContent() {
   };
 
     // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
-    useEffect(() => {
-    if (tracking && position) {
-        fetchRoute(position);
+useEffect(() => {
+  if (tracking) {
+    console.log('GPS useEffect triggered — starting watchPosition');  // Debug log
 
-        const interval = setInterval(() => {
-        fetchRoute(position);
-        }, 15000);
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setPosition(newPos);
+        console.log('GPS success — new position:', newPos);  // Debug log
 
-        return () => clearInterval(interval);
-    }
-    }, [tracking, position]);
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [newPos.lng, newPos.lat],
+            zoom: 16,
+            duration: 2000,
+          });
+        }
+      },
+      (err) => {
+        console.error("GPS Error:", err);
+        alert("Location access denied or unavailable");
+        setTracking(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
 
-  useEffect(() => {
-    if (tracking && sheetRef.current) {
-      sheetRef.current.snapTo(1);
-    }
-  }, [tracking]);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      console.log('GPS useEffect cleanup — watch cleared');  // Debug log
+    };
+  }
+}, [tracking]);
+
+useEffect(() => {
+  if (tracking && position) {
+    console.log('Route fetch useEffect triggered — calling fetchRoute');  // Debug log
+    fetchRoute(position);
+
+    const interval = setInterval(() => {
+      fetchRoute(position);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }
+}, [tracking, position]);
+
+useEffect(() => {
+  if (tracking && sheetRef.current) {
+    sheetRef.current.snapTo(1);
+  }
+}, [tracking]);
 
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
@@ -258,9 +292,14 @@ return (
                   <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>-- mi • --:-- AM</p>
                 </div>
                 <button
-                  onClick={() => claimed ? setTracking(true) : null}
-                  disabled={!claimed}
-                  style={{
+                onClick={() => {
+                    if (claimed) {
+                    console.log('Start button clicked — setting tracking to true');  // Debug log
+                    setTracking(true);
+                    }
+                }}
+                disabled={!claimed}
+                style={{
                     padding: '10px 20px',
                     fontSize: '16px',
                     fontWeight: 'bold',
@@ -268,9 +307,10 @@ return (
                     background: claimed ? '#16a34a' : '#d1d5db',
                     border: 'none',
                     borderRadius: '20px',
-                  }}
+                    cursor: claimed ? 'pointer' : 'not-allowed',
+                }}
                 >
-                  Start
+                Start
                 </button>
               </div>
             </div>
