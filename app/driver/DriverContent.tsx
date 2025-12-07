@@ -240,7 +240,7 @@ return (
 
         {/* Live ETA Row - Only When Tracking (This is the ONLY thing in peek) */}
         {tracking && (
-          <div style={{
+        <div style={{
             background: '#ecfdf5',
             borderRadius: '12px',
             padding: '14px',  // Slightly tighter
@@ -249,14 +249,18 @@ return (
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: 0  // No extra margin
-          }}>
+        }}>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '26px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>-- min</p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>-- mi • --:-- AM</p>
+            <p style={{ fontSize: '26px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>
+                {etaMinutes !== null ? `${etaMinutes} min` : '-- min'}
+            </p>
+            <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
+                {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
+            </p>
             </div>
             <button
-              onClick={() => setTracking(false)}
-              style={{
+            onClick={() => setTracking(false)}
+            style={{
                 padding: '10px 20px',
                 fontSize: '16px',
                 fontWeight: 'bold',
@@ -264,11 +268,11 @@ return (
                 background: '#dc2626',
                 border: 'none',
                 borderRadius: '20px',
-              }}
+            }}
             >
-              Stop
+            Stop
             </button>
-          </div>
+        </div>
         )}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
@@ -279,41 +283,45 @@ return (
               Tap below to begin tracking and navigation
             </p>
 
-            {/* Trip Summary Card (Pre-Tracking) */}
-            <div style={{
-              background: '#f3f4f6',
-              borderRadius: '12px',
-              padding: '16px',
-              marginBottom: '16px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>-- min</p>
-                  <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>-- mi • --:-- AM</p>
-                </div>
-                <button
-                onClick={() => {
-                    if (claimed) {
-                    console.log('Start button clicked — setting tracking to true');  // Debug log
-                    setTracking(true);
-                    }
-                }}
-                disabled={!claimed}
-                style={{
-                    padding: '10px 20px',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    background: claimed ? '#16a34a' : '#d1d5db',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: claimed ? 'pointer' : 'not-allowed',
-                }}
-                >
-                Start
-                </button>
-              </div>
+        {/* Trip Summary Card (Pre-Tracking) */}
+        <div style={{
+        background: '#f3f4f6',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '16px'
+        }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
+                {etaMinutes !== null ? `${etaMinutes} min` : '-- min'}
+            </p>
+            <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
+                {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
+            </p>
             </div>
+            <button
+            onClick={() => {
+                if (claimed) {
+                console.log('Start button clicked — setting tracking to true');
+                setTracking(true);
+                }
+            }}
+            disabled={!claimed}
+            style={{
+                padding: '10px 20px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: 'white',
+                background: claimed ? '#16a34a' : '#d1d5db',
+                border: 'none',
+                borderRadius: '20px',
+                cursor: claimed ? 'pointer' : 'not-allowed',
+            }}
+            >
+            Start
+            </button>
+        </div>
+        </div>
 
             {/* Ticket Summary + Claim Button */}
             <div style={{
