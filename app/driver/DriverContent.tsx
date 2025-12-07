@@ -1,7 +1,6 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import { useRef, useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
@@ -9,6 +8,7 @@ import mbxClient from '@mapbox/mapbox-sdk';
 import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
 import { Source, Layer } from 'react-map-gl/mapbox';
+import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -180,9 +180,11 @@ useEffect(() => {
   }
 }, [tracking, position]);
 
-useEffect(() => {
+useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
-    sheetRef.current.snapTo(1);
+    requestAnimationFrame(() => {
+      sheetRef.current.snapTo(1); // Peek
+    });
   }
 }, [tracking]);
 
@@ -246,40 +248,37 @@ return (
         )}
         </Map>
 
-    {/* Re-Center Button - Overlaid on Map */}
-    {tracking && position && (
-      <div
+    {tracking && position && sheetSnap !== 0 && (
+    <div
         style={{
-          position: 'absolute',
-          bottom: '220px',
-          right: '16px',
-          background: 'white',
-          borderRadius: '50%',
-          width: '56px',
-          height: '56px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-          zIndex: 1000,
-          border: '2px solid #ddd',
+        position: 'absolute',
+        bottom: '240px',  // High enough for all phones
+        right: '16px',
+        background: 'white',
+        borderRadius: '50%',
+        width: '56px',
+        height: '56px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        zIndex: 2000,
+        border: '2px solid #eee',
         }}
         onClick={() => {
-          if (mapRef.current && position) {
-            mapRef.current.flyTo({
-              center: [position.lng, position.lat],
-              zoom: 16,
-              duration: 1500,
-            });
-          }
+        mapRef.current?.flyTo({
+            center: [position.lng, position.lat],
+            zoom: 16,
+            duration: 1500,
+        });
         }}
-      >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 8v8" />
-          <path d="M8 12h8" />
+    >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 8v8" />
+        <path d="M8 12h8" />
         </svg>
-      </div>
+    </div>
     )}
 
     {/* Bottom Sheet */}
