@@ -21,6 +21,7 @@ export default function DriverContent() {
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
+  const [arrived, setArrived] = useState(false);
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
@@ -67,14 +68,24 @@ export default function DriverContent() {
     }
   };
 
-  // ← ADD formatDuration HELPER FUNCTION HERE
-  const formatDuration = (minutes: number | null) => {
-    if (minutes === null || minutes === undefined) return '-- min';
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours} h ${mins > 0 ? `${mins} min` : ''}`;
-  };
+    // ← ADD formatDuration HELPER FUNCTION HERE
+    const formatDuration = (minutes: number | null) => {
+        if (minutes === null || minutes === undefined) return '-- min';
+        if (minutes < 60) return `${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours} h ${mins > 0 ? `${mins} min` : ''}`;
+    };
+
+    const checkArrival = (currentPos: { lat: number; lng: number }) => {
+    if (!destination) return false;
+    const dist = turf.distance(
+        [currentPos.lng, currentPos.lat],
+        [destination.lng, destination.lat],
+        { units: 'meters' }
+    );
+    return dist < 75;  // ~75 meters = arrived
+    };
 
     // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
@@ -112,14 +123,22 @@ useEffect(() => {
 
 useEffect(() => {
   if (tracking && position) {
-    console.log('Route fetch useEffect triggered — calling fetchRoute');  // Debug log
     fetchRoute(position);
 
     const interval = setInterval(() => {
       fetchRoute(position);
+
+      // Check arrival
+      if (checkArrival(position)) {
+        setArrived(true);
+        // Optional: auto-stop tracking
+        // setTracking(false);
+      }
     }, 15000);
 
     return () => clearInterval(interval);
+  } else {
+    setArrived(false);  // Reset on stop
   }
 }, [tracking, position]);
 
@@ -267,22 +286,42 @@ return (
                 {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
             </p>
             </div>
-            <button
-            onClick={() => setTracking(false)}
-            style={{
-                padding: '10px 20px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                color: 'white',
-                background: '#dc2626',
-                border: 'none',
-                borderRadius: '20px',
+
+        <button
+            onClick={() => {
+            setTracking(false);
+            // TODO: Firebase ticket update to "delivered" in Brick 9
+            alert('Arrival confirmed! Ticket delivered.');
             }}
-            >
-            Stop
-            </button>
-        </div>
-        )}
+            style={{
+            padding: '14px 28px',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: 'white',
+            background: '#2563eb',
+            border: 'none',
+            borderRadius: '20px',
+            }}
+        >
+            I'VE ARRIVED
+        </button>
+        ) : (
+        <button
+        onClick={() => setTracking(false)}
+        style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: 'white',
+            background: '#dc2626',
+            border: 'none',
+            borderRadius: '20px',
+        }}
+        >
+        Stop
+        </button>
+                </div>
+                )}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
         {!tracking && (
