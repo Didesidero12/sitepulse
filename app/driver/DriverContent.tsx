@@ -27,8 +27,8 @@ export default function DriverContent() {
 
   // Parse URL params (now safe inside client component)
     const searchParams = useSearchParams();
-    const destLat = parseFloat(searchParams.get('destLat') || '37.7749');
-    const destLng = parseFloat(searchParams.get('destLng') || '-122.4194');
+    const destLat = parseFloat(searchParams.get('destLat') || '46.21667'); // Your Kennewick office
+    const destLng = parseFloat(searchParams.get('destLng') || '-119.22323');
     const destination = { lat: destLat, lng: destLng };
 
     // ← ADD fetchRoute HERE
@@ -266,34 +266,35 @@ return (
           <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
         </div>
 
-        {/* Live ETA Row - Only When Tracking (This is the ONLY thing in peek) */}
-        {tracking && (
-        <div style={{
-            background: '#ecfdf5',
-            borderRadius: '12px',
-            padding: '14px',  // Slightly tighter
-            border: '1px solid #86efac',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 0  // No extra margin
-        }}>
-            <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>
-            {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
-            </p>
-            <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
-                {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
-            </p>
-            </div>
+{/* Live ETA Row - Only When Tracking */}
+{tracking && (
+  <div style={{
+    background: '#ecfdf5',
+    borderRadius: '12px',
+    padding: '14px',
+    border: '1px solid #86efac',
+    display: 'flex',
+    flexDirection: 'column',  // Changed to column to stack ETA + warning + button
+    gap: '12px',  // Clean spacing
+  }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>
+          {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
+        </p>
+        <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
+          {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
+        </p>
+      </div>
 
+      {/* Conditional Button: I've Arrived or Stop */}
+      {arrived ? (
         <button
-            onClick={() => {
+          onClick={() => {
             setTracking(false);
-            // TODO: Firebase ticket update to "delivered" in Brick 9
             alert('Arrival confirmed! Ticket delivered.');
-            }}
-            style={{
+          }}
+          style={{
             padding: '14px 28px',
             fontSize: '18px',
             fontWeight: 'bold',
@@ -301,14 +302,14 @@ return (
             background: '#2563eb',
             border: 'none',
             borderRadius: '20px',
-            }}
+          }}
         >
-            I'VE ARRIVED
+          I'VE ARRIVED
         </button>
-        ) : (
+      ) : (
         <button
-        onClick={() => setTracking(false)}
-        style={{
+          onClick={() => setTracking(false)}
+          style={{
             padding: '10px 20px',
             fontSize: '16px',
             fontWeight: 'bold',
@@ -316,12 +317,32 @@ return (
             background: '#dc2626',
             border: 'none',
             borderRadius: '20px',
-        }}
+          }}
         >
-        Stop
+          Stop
         </button>
-                </div>
-                )}
+      )}
+    </div>
+
+    {/* Forklift / Site Assistance Warning — Only when arrived */}
+    {arrived && (
+      <div style={{
+        background: '#fef9c3',
+        padding: '12px',
+        borderRadius: '8px',
+        border: '1px solid #facc15',
+        color: '#713f12',
+        textAlign: 'center',
+        fontWeight: 'bold',
+        fontSize: '14px',
+      }}>
+        ⚠️ <strong>Forklift Alert:</strong> Heavy machinery active on site — stay vigilant!
+        {/* Future: Dynamic message */}
+        {/* {ticket.equipmentNeeded ? `${ticket.equipmentNeeded} Required` : 'Heavy machinery active — stay vigilant!'} */}
+      </div>
+    )}
+  </div>
+)}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
         {!tracking && (
