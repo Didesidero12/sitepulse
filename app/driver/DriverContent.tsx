@@ -476,26 +476,28 @@ return (
       )}
     </div>
 
-    {/* Forklift / Site Assistance Warning — Only when arrived */}
-    {arrived && (
-    <div style={{
-        background: '#fef9c3',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid #facc15',
-        color: '#713f12',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        fontSize: '14px',
-        marginTop: '12px',
-    }}>
-        ⚠️ <strong>{equipmentNeeded} Alert:</strong> Heavy machinery active — stay vigilant!
-            {/* Future: Dynamic message */}
-            {/* {ticket.equipmentNeeded ? `${ticket.equipmentNeeded} Required` : 'Heavy machinery active — stay vigilant!'} */}
-        </div>
-        )}
-    </div>
-    )}
+{/* Forklift / Site Assistance Warning — Only when arrived */}
+{arrived && (
+  <div style={{
+    background: '#fef9c3',
+    padding: '12px',
+    borderRadius: '8px',
+    border: '1px solid #facc15',
+    color: '#713f12',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    marginTop: '12px',
+  }}>
+    ⚠️ <strong>
+      {ticket?.equipmentNeeded 
+        ? `${ticket.equipmentNeeded} Alert` 
+        : ticket?.needsForklift 
+          ? 'Forklift Alert' 
+          : 'Site Assistance Required'}
+    </strong>: Heavy machinery active on site — stay vigilant!
+  </div>
+)}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
         {!tracking && (
