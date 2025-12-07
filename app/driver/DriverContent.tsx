@@ -129,7 +129,7 @@ return (
           }}
         />
       </Marker>
-      
+
         {/* ← ADD THE BLUE ROUTE LINE HERE */}
         {route && (
             <Source id="route" type="geojson" data={route}>
@@ -184,14 +184,14 @@ return (
 
     {/* Bottom Sheet */}
     <Sheet
-      ref={sheetRef}
-      isOpen={true}
-      onClose={() => {}}
-      snapPoints={[0.6, 0.15]}
-      initialSnap={1}
-      onSnap={(index) => setSheetSnap(index)}
-      disableDismiss={true}
-      disableDrag={false}
+    ref={sheetRef}
+    isOpen={true}
+    onClose={() => {}}
+    snapPoints={[0, 0.15, 0.6, 1]}  // Fixed: ascending with 0 and 1
+    initialSnap={1}  // Start at peek (0.15)
+    onSnap={(index) => setSheetSnap(index)}
+    disableDismiss={true}
+    disableDrag={false}
     >
   <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
