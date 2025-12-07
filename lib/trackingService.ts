@@ -1,5 +1,5 @@
 // lib/trackingService.ts
-import { db } from '@/app/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 let activeWatchId: number | null = null;

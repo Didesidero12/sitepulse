@@ -3,7 +3,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { db } from '@/app/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';

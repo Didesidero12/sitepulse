@@ -9,33 +9,66 @@ import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
 import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
+import { db } from '@/lib/firebase.js';
+import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
 export default function DriverContent() {
+  // UI & Tracking State
   const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
+  const [arrived, setArrived] = useState(false);
+  const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
+
+  // Route & Guidance State
   const [route, setRoute] = useState<any>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
-  const [arrived, setArrived] = useState(false);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
+
+  // Notification State
   const [notified30Min, setNotified30Min] = useState(false);
   const [notified5Min, setNotified5Min] = useState(false);
-  const [equipmentNeeded, setEquipmentNeeded] = useState('Forklift'); // Stub
-  const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
+
+  // Ticket Integration State (Brick 9)
+  const [ticket, setTicket] = useState<any>(null);  // Full ticket from Firebase
+  const [loadingTicket, setLoadingTicket] = useState(true);  // Show loading if needed
+
+  // Refs
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
 
-  // Parse URL params (now safe inside client component)
-    const searchParams = useSearchParams();
-    const destLat = parseFloat(searchParams.get('destLat') || '46.21667'); // Your Kennewick office
-    const destLng = parseFloat(searchParams.get('destLng') || '-119.22323');
-    const destination = { lat: destLat, lng: destLng };
+ // Parse URL params (keep searchParams for other uses if needed)
+const searchParams = useSearchParams();
+
+// Dynamic destination: 
+// 1. ticket.siteCoords (from Firebase — changes if GC updates)
+// 2. URL params (fallback for testing or no ticket)
+// 3. Kennewick office (hard fallback)
+let destLat = 46.21667;  // Kennewick fallback
+let destLng = -119.22323;
+
+if (ticket?.siteCoords) {
+  // Priority 1: Real-time from ticket (GC can change this mid-route)
+  destLat = ticket.siteCoords.lat;
+  destLng = ticket.siteCoords.lng;
+} else {
+  // Priority 2: URL params (for manual testing or no ticket)
+  const urlLat = searchParams.get('destLat');
+  const urlLng = searchParams.get('destLng');
+  if (urlLat && urlLng) {
+    destLat = parseFloat(urlLat);
+    destLng = parseFloat(urlLng);
+  }
+  // Priority 3: Hard fallback (Kennewick office)
+}
+
+const destination = { lat: destLat, lng: destLng };
 
     // ← ADD fetchRoute HERE
   const fetchRoute = async (origin: { lat: number; lng: number }) => {
@@ -85,25 +118,24 @@ export default function DriverContent() {
       setNextInstruction('Follow the route');
     }
   };
-    //GC Alerts - 5Min/30Min
-    const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
-        try {
-        console.log(`GC Notification: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
-        alert(`GC Alert: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`); // Temp visible feedback
-        // TODO: Real Firebase update in Brick 9
-        } catch (err) {
-        console.error('Notification error:', err);
-        }
-    };  
 
-    // ← ADD formatDuration HELPER FUNCTION HERE
-    const formatDuration = (minutes: number | null) => {
-        if (minutes === null || minutes === undefined) return '-- min';
-        if (minutes < 60) return `${minutes} min`;
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return `${hours} h ${mins > 0 ? `${mins} min` : ''}`;
-    };
+  // Helper Functions (grouped together)
+  const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
+    try {
+      console.log(`GC Notification: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
+      alert(`GC Alert: Delivery is ${milestone === '30min' ? '30 min' : '5 min'} out!`);
+    } catch (err) {
+      console.error('Notification error:', err);
+    }
+  };
+
+  const formatDuration = (minutes: number | null) => {
+    if (minutes === null || minutes === undefined) return '-- min';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours} h ${mins > 0 ? `${mins} min` : ''}`;
+  };
 
     const checkArrival = (currentPos: { lat: number; lng: number }) => {
     if (!destination) return false;
@@ -148,6 +180,32 @@ useEffect(() => {
     };
   }
 }, [tracking]);
+
+// UseEffect (Realtime Ticket Listener)
+useEffect(() => {
+  const ticketId = searchParams.get('ticketId');
+  if (!ticketId) {
+    setLoadingTicket(false);
+    return;
+  }
+
+  const ticketRef = doc(db, 'tickets', ticketId);
+  const unsubscribe = onSnapshot(ticketRef, (doc) => {
+    if (doc.exists()) {
+      const data = doc.data();
+      setTicket(data);
+      console.log('Ticket loaded:', data);
+    } else {
+      console.log('No such ticket!');
+    }
+    setLoadingTicket(false);
+  }, (error) => {
+    console.error('Ticket load error:', error);
+    setLoadingTicket(false);
+  });
+
+  return unsubscribe;
+}, [searchParams]);
 
 useEffect(() => {
   if (tracking && position) {
