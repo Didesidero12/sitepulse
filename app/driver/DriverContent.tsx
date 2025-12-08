@@ -18,7 +18,7 @@ export default function DriverContent() {
   // UI & Tracking State
   const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
-  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [position, setPosition] = useState<{ lat: number; lng: number; heading?: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
@@ -122,7 +122,7 @@ const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
     }
   };
 
-  const formatDuration = (minutes: number | null) => {
+const formatDuration = (minutes: number | null) => {
     if (minutes === null || minutes === undefined) return '-- min';
     if (minutes < 60) return `${minutes} min`;
     const hours = Math.floor(minutes / 60);
@@ -130,16 +130,47 @@ const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
     return `${hours} h ${mins > 0 ? `${mins} min` : ''}`;
   };
 
-    const checkArrival = (currentPos: { lat: number; lng: number }) => {
+  const checkArrival = (currentPos: { lat: number; lng: number }) => {
     if (!destination) return false;
     const dist = turf.distance(
-        [currentPos.lng, currentPos.lat],
-        [destination.lng, destination.lat],
-        { units: 'meters' }
+      [currentPos.lng, currentPos.lat],
+      [destination.lng, destination.lat],
+      { units: 'meters' }
     );
     return dist < 75;  // ~75 meters = arrived
+  };
+
+  // ← ADD SMOOTH DOT ANIMATION HELPER HERE
+  let animationFrameId: number | null = null;
+  let targetPosition: { lat: number; lng: number } | null = null;
+
+  const animateMarker = (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    const startTime = performance.now();
+    const duration = 2000; // 2 seconds smooth animation
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Linear interpolation
+      const lat = from.lat + (to.lat - from.lat) * progress;
+      const lng = from.lng + (to.lng - from.lng) * progress;
+
+      setPosition({ lat, lng });
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        animationFrameId = null;
+      }
     };
 
+    animationFrameId = requestAnimationFrame(animate);
+  };
+
+    //Ticket Listener
     useEffect(() => {
   const ticketId = searchParams.get('ticketId');
   if (!ticketId) {
@@ -169,17 +200,31 @@ const sendGCMilestoneNotification = async (milestone: '30min' | '5min') => {
   return () => unsubscribe();
 }, [searchParams]);
 
-    // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
   if (tracking) {
-    console.log('GPS useEffect triggered — starting watchPosition');  // Debug log
+    console.log('GPS useEffect triggered — starting watchPosition');
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setPosition(newPos);
-        console.log('GPS success — new position:', newPos);  // Debug log
+        const newPos = { 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading ?? undefined  // ← Capture heading (null if unavailable)
+        };
+        console.log('GPS success — new position + heading:', newPos);
 
+        // Smooth animation if we have a previous position
+        if (position) {
+          animateMarker(position, newPos);
+        } else {
+          // First position — instant set
+          setPosition(newPos);
+        }
+
+        // Always update target for re-center button
+        targetPosition = newPos;
+
+        // Camera follow (smooth flyTo)
         if (mapRef.current) {
           mapRef.current.flyTo({
             center: [newPos.lng, newPos.lat],
@@ -198,7 +243,8 @@ useEffect(() => {
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      console.log('GPS useEffect cleanup — watch cleared');  // Debug log
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      console.log('GPS useEffect cleanup — watch cleared');
     };
   }
 }, [tracking]);
@@ -320,22 +366,27 @@ return (
       mapStyle="mapbox://styles/mapbox/streets-v12"
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
     >
-      {/* Cyan Dot Marker */}
-      {tracking && position && (
-        <Marker longitude={position.lng} latitude={position.lat}>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              background: 'cyan',
-              border: '4px solid white',
-              borderRadius: '50%',
-              boxShadow: '0 0 20px rgba(0, 255, 255, 0.8)',
-              animation: 'pulse 2s infinite',
-            }}
-          />
-        </Marker>
-      )}
+{tracking && position && (
+  <Marker
+    longitude={position.lng}
+    latitude={position.lat}
+    anchor="center"
+    rotationAlignment="map"
+    rotation={position.heading ?? 0}  // Rotates arrow based on heading
+  >
+    <div
+      style={{
+        width: '40px',
+        height: '40px',
+        background: 'cyan',
+        border: '5px solid white',
+        borderRadius: '50% 50% 50% 0',
+        transform: 'rotate(-45deg)',  // Creates arrow shape (point forward)
+        boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
+      }}
+    />
+  </Marker>
+)}
       {/* Red Destination Pin */}
       <Marker longitude={destination.lng} latitude={destination.lat}>
         <div
@@ -449,14 +500,33 @@ return (
         )}
       </div>
 
-      {/* Conditional Button Flow: Confirm / Not Yet, I've Arrived, or Stop */}
+       {/* Conditional Button Flow: Confirm / Not Yet, I've Arrived, or Stop */}
       {showArrivalConfirm ? (
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
-            onClick={() => {
-              setTracking(false);
-              setShowArrivalConfirm(false);
-              alert('Arrival confirmed! Ticket delivered.');
+            onClick={async () => {
+              const ticketId = searchParams.get('ticketId');
+              if (!ticketId) {
+                alert('Error: No ticket ID found.');
+                setTracking(false);
+                setShowArrivalConfirm(false);
+                return;
+              }
+
+              try {
+                await updateDoc(doc(db, 'tickets', ticketId), {
+                  status: 'delivered',
+                  deliveredAt: serverTimestamp(),
+                });
+                console.log(`Ticket ${ticketId} marked as delivered`);
+                alert('Arrival confirmed! Ticket delivered.');
+              } catch (err) {
+                console.error('Failed to update ticket:', err);
+                alert('Error confirming delivery. Try again.');
+              } finally {
+                setTracking(false);
+                setShowArrivalConfirm(false);
+              }
             }}
             style={{
               padding: '14px 28px',
@@ -489,9 +559,27 @@ return (
         </div>
       ) : arrived ? (
         <button
-          onClick={() => {
-            setTracking(false);
-            alert('Arrival confirmed! Ticket delivered.');
+          onClick={async () => {
+            const ticketId = searchParams.get('ticketId');
+            if (!ticketId) {
+              alert('Error: No ticket ID found.');
+              setTracking(false);
+              return;
+            }
+
+            try {
+              await updateDoc(doc(db, 'tickets', ticketId), {
+                status: 'delivered',
+                deliveredAt: serverTimestamp(),
+              });
+              console.log(`Ticket ${ticketId} marked as delivered`);
+              alert('Arrival confirmed! Ticket delivered.');
+            } catch (err) {
+              console.error('Failed to update ticket:', err);
+              alert('Error confirming delivery. Try again.');
+            } finally {
+              setTracking(false);
+            }
           }}
           style={{
             padding: '14px 28px',
@@ -523,29 +611,29 @@ return (
       )}
     </div>
 
-{/* Forklift / Site Assistance Warning — Only when arrived */}
-{arrived && (
-  <div style={{
-    background: '#fef9c3',
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #facc15',
-    color: '#713f12',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    marginTop: '12px',
-  }}>
-    ⚠️ <strong>
-      {ticket?.equipmentNeeded 
-        ? `${ticket.equipmentNeeded} Alert` 
-        : ticket?.needsForklift 
-          ? 'Forklift Alert' 
-          : 'Site Assistance Required'}
-    </strong>: Heavy machinery active on site — stay vigilant!
-</div>
+    {/* Dynamic Equipment / Site Assistance Warning — Only when arrived */}
+    {arrived && (
+      <div style={{
+        background: '#fef9c3',
+        padding: '12px',
+        borderRadius: '8px',
+        border: '1px solid #facc15',
+        color: '#713f12',
+        textAlign: 'center',
+        fontWeight: 'bold',
+        fontSize: '14px',
+        marginTop: '12px',
+      }}>
+        ⚠️ <strong>
+          {ticket?.equipmentNeeded 
+            ? `${ticket.equipmentNeeded} Alert` 
+            : ticket?.needsForklift 
+              ? 'Forklift Alert' 
+              : 'Site Assistance Required'}
+        </strong>: Heavy machinery active on site — stay vigilant!
+      </div>
     )}
-  </div>  
+  </div>
 )}
 
         {/* Pre-Tracking Content - Only Visible When Not Tracking */}
@@ -596,37 +684,76 @@ return (
         </div>
         </div>
 
-            {/* Ticket Summary + Claim Button */}
-            <div style={{
-              background: '#f3f4f6',
-              borderRadius: '12px',
-              padding: '12px',
-              fontSize: '14px',
-              color: '#333',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div>
-                <p style={{ margin: '0 0 4px' }}><strong>Materials:</strong> Doors from Italy (12 bifolds)</p>
-                <p style={{ margin: '0' }}><strong>Forklift Needed:</strong> Yes</p>
-              </div>
-              <button
-                onClick={() => setClaimed(true)}
-                disabled={claimed}
-                style={{
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: 'white',
-                  background: claimed ? '#d1d5db' : '#3b82f6',
-                  border: 'none',
-                  borderRadius: '20px',
-                }}
-              >
-                {claimed ? 'Claimed' : 'Claim Delivery'}
-              </button>
+      {/* Ticket Summary + Claim Button — Dynamic from Real Ticket */}
+      <div style={{
+        background: '#f3f4f6',
+        borderRadius: '12px',
+        padding: '12px',
+        fontSize: '14px',
+        color: '#333',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }}>
+        <div>
+          <p style={{ margin: '0 0 4px' }}>
+            <strong>Materials:</strong> {ticket?.material || 'Loading...'} ({ticket?.qty || ''})
+          </p>
+          <p style={{ margin: '0 0 4px' }}>
+            <strong>Forklift Needed:</strong> {ticket?.needsForklift ? 'Yes' : 'No'}
+          </p>
+          {ticket?.projectName && (
+            <p style={{ margin: '0 0 4px' }}>
+              <strong>Project:</strong> {ticket.projectName}
+            </p>
+          )}
+          {ticket?.projectAddress && (
+            <p style={{ margin: '0 0 4px' }}>
+              <strong>Address:</strong> {ticket.projectAddress}
+            </p>
+          )}
+          {ticket?.csiDivision && (
+            <p style={{ margin: '0 0 4px' }}>
+              <strong>CSI Division:</strong> {ticket.csiDivision}
+            </p>
+          )}
+          {ticket?.projectContacts && ticket.projectContacts.length > 0 && (
+            <div style={{ margin: '8px 0 0' }}>
+              <strong>Contacts:</strong>
+              <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
+                {ticket.projectContacts.map((contact: any, i: number) => (
+                  <li key={i}>
+                    {contact.name} ({contact.role}):{' '}
+                    <a href={`tel:${contact.phone}`} style={{ color: '#3b82f6' }}>
+                      {contact.phone}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => {
+            setClaimed(true);
+            // TODO: Real Firebase claim update in Brick 9
+          }}
+          disabled={claimed}
+          style={{
+            padding: '8px 16px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            color: 'white',
+            background: claimed ? '#d1d5db' : '#3b82f6',
+            border: 'none',
+            borderRadius: '20px',
+            alignSelf: 'flex-end',
+          }}
+        >
+          {claimed ? 'Claimed' : 'Claim Delivery'}
+        </button>
+      </div>
           </>
         )}
 

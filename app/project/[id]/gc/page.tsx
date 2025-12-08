@@ -18,43 +18,61 @@ export default function SuperWarRoom() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [pendingTickets, setPendingTickets] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"live" | "pending">("live");
+  const [activeAlerts, setActiveAlerts] = useState<string[]>([]);
 
   const siteLocation = { lat: 45.5231, lng: -122.6765 };
 
-// LIVE TRUCKS + GC Milestone Alerts
-  useEffect(() => {
-    const q = query(
-      collection(db, "tickets"),
-      where("projectId", "==", id),
-      where("status", "==", "en_route")
-    );
+// LIVE TRUCKS + GC Milestone Alerts (Banner Version)
+useEffect(() => {
+  const q = query(
+    collection(db, "tickets"),
+    where("projectId", "==", id),
+    where("status", "==", "en_route")
+  );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const list: any[] = [];
-      snap.forEach((doc) => {
-        const data = doc.data();
-        const ticketId = doc.id;
+  const unsub = onSnapshot(q, (snap) => {
+    const list: any[] = [];
+    const newAlerts: string[] = [];
 
-        // GC Milestone Alerts
-        if (data.gcNotified30min && !data.gcAlert30minShown) {
-          alert(`Delivery Inbound: 30 min out!\n${data.material || 'Load'} • ${data.qty || ''}`);
-          // Mark as shown to prevent spam
-          updateDoc(doc.ref, { gcAlert30minShown: true });
-        }
-        if (data.gcNotified5min && !data.gcAlert5minShown) {
-          alert(`Delivery Arriving Soon: 5 min out!\n${data.material || 'Load'} • ${data.qty || ''}`);
-          updateDoc(doc.ref, { gcAlert5minShown: true });
-        }
+    snap.forEach((doc) => {
+      const data = doc.data();
+      const ticketId = doc.id;
 
-        if (data.driverLocation) {
-          list.push({ id: ticketId, ...data });
-        }
-      });
-      setDeliveries(list);
+      // GC Milestone Alerts (Banner)
+      if (data.gcNotified30min && !data.gcAlert30minShown) {
+        newAlerts.push(`Delivery Inbound: 30 min out! — ${data.material || 'Load'} • ${data.qty || ''}`);
+        updateDoc(doc.ref, { gcAlert30minShown: true });
+      }
+      if (data.gcNotified5min && !data.gcAlert5minShown) {
+        newAlerts.push(`Delivery Arriving Soon: 5 min out! — ${data.material || 'Load'} • ${data.qty || ''}`);
+        updateDoc(doc.ref, { gcAlert5minShown: true });
+      }
+
+      if (data.driverLocation) {
+        list.push({ id: ticketId, ...data });
+      }
     });
 
-    return unsub;
-  }, [id]);
+    setDeliveries(list);
+    if (newAlerts.length > 0) {
+      setActiveAlerts((prev) => [...prev, ...newAlerts]);  // Append to existing
+      // Optional sound
+      // new Audio('/alert-sound.mp3').play().catch(() => {});
+    }
+  });
+
+  return unsub;
+}, [id]);
+
+//Auto-Clear Old Alerts
+useEffect(() => {
+  if (activeAlerts.length > 0) {
+    const timer = setTimeout(() => {
+      setActiveAlerts([]);
+    }, 15000);
+    return () => clearTimeout(timer);
+  }
+}, [activeAlerts]);
 
   // PENDING TICKETS
   useEffect(() => {
@@ -73,21 +91,33 @@ export default function SuperWarRoom() {
     return unsub;
   }, [id]);
 
-  // QUICK TICKET — FINAL, WORKS EVERYWHERE
-  const createQuickTicket = async () => {
-    const shortId = generateShortId(7);
-    await addDoc(collection(db, "tickets"), {
-      projectId: id,
-      material: "Doors from Italy",
-      qty: "12 bifolds",
-      needsForklift: true,
-      status: "pending",
-      driverId: null,
-      shortId,
-      createdAt: serverTimestamp(),
-    });
+// QUICK TICKET — FINAL, WORKS EVERYWHERE
+const createQuickTicket = async () => {
+  const shortId = generateShortId(7);
+  await addDoc(collection(db, "tickets"), {
+    projectId: id,
+    material: "Doors from Italy",
+    qty: "12 bifolds",
+    status: "pending",
+    driverId: null,
+    shortId,
+    createdAt: serverTimestamp(),
+    // New / Updated Fields
+    projectName: "Kennewick Project X",  // Pull from project doc later
+    projectAddress: "602 N Colorado St Suite 110, Kennewick, WA 99336",
+    siteCoords: {
+      lat: 46.21667,
+      lng: -119.22323,
+    },
+    csiDivision: "08 - Doors and Windows",
+    loadingEquipment: "Forklift",  // ← Replaces needsForklift — flexible string
+    projectContacts: [
+      { name: "John GC", phone: "509-123-4567", role: "Superintendent" },
+      { name: "Jane PM", phone: "509-987-6543", role: "Project Manager" },
+    ],
+  });
 
-    const shareUrl = `${window.location.origin}/ticket/${shortId}`;
+  const shareUrl = `${window.location.origin}/ticket/${shortId}`;
 
     if (navigator.share) {
       try {
@@ -167,17 +197,18 @@ export default function SuperWarRoom() {
 
 {activeTab === "live" && (
   <div className="flex-1 p-6 relative">
-    {/* Milestone Banner */}
-    {deliveries.some(d => d.gcNotified30min && !d.gcAlert30minShown) && (
-      <div className="bg-yellow-600 text-white p-4 rounded-lg mb-4 text-center font-bold text-xl">
-        🚛 Delivery 30 min out — Prepare site!
+    {/* Milestone Alert Banners */}
+    {activeAlerts.map((alert, i) => (
+      <div
+        key={i}
+        className={`mb-4 p-4 rounded-lg text-white font-bold text-center shadow-lg transition-all ${
+          alert.includes('30 min') ? 'bg-yellow-600' : 'bg-red-600'
+        }`}
+        style={{ animation: 'fadeIn 0.5s, fadeOut 10s 5s forwards' }}  // Fade out after 10s
+      >
+        🚛 {alert}
       </div>
-    )}
-    {deliveries.some(d => d.gcNotified5min && !d.gcAlert5minShown) && (
-      <div className="bg-red-600 text-white p-4 rounded-lg mb-4 text-center font-bold text-xl">
-        🚨 Delivery arriving in 5 min!
-      </div>
-    )}
+    ))}
 
     <div ref={mapContainer} className="w-full h-full rounded-2xl bg-gray-800 overflow-hidden" style={{ height: "70vh" }} />
   </div>
