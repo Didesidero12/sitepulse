@@ -178,17 +178,6 @@ const formatDuration = (minutes: number | null) => {
     animationFrameId = requestAnimationFrame(animate);
   };
 
-  //Add Initial Map FlyTo on Mount (Fix "Entire Planet" Load)
-    useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: [destination.lng, destination.lat],
-        zoom: 12,
-        duration: 0,  // Instant on load
-      });
-    }
-  }, []);  // Only on mount
-
     //Ticket Listener
     useEffect(() => {
   const ticketId = searchParams.get('ticketId');
