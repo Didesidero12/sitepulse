@@ -22,6 +22,7 @@ export default function DriverContent() {
   const [claimed, setClaimed] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
+  const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -417,37 +418,61 @@ return (
         )}
         </Map>
 
+    {/* Floating Controls: Orientation Toggle + Re-Center */}
     {tracking && position && sheetSnap !== 0 && (
-    <div
-        style={{
-        position: 'absolute',
-        bottom: '240px',  // High enough for all phones
-        right: '16px',
-        background: 'white',
-        borderRadius: '50%',
-        width: '56px',
-        height: '56px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-        zIndex: 2000,
-        border: '2px solid #eee',
-        }}
-        onClick={() => {
-        mapRef.current?.flyTo({
-            center: [position.lng, position.lat],
-            zoom: 16,
-            duration: 1500,
-        });
-        }}
-    >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 8v8" />
-        <path d="M8 12h8" />
-        </svg>
-    </div>
+      <div style={{ position: 'absolute', bottom: '180px', right: '16px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 2000 }}>
+        {/* Orientation Toggle Button */}
+        <div
+          style={{
+            background: headingUp ? '#2563eb' : 'white',
+            color: headingUp ? 'white' : '#333',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            border: '2px solid #eee',
+            cursor: 'pointer',
+          }}
+          onClick={() => setHeadingUp(!headingUp)}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 2L2 12h3v8h14v-8h3L12 2z" />
+            <path d="M12 8v8" />
+          </svg>
+        </div>
+
+        {/* Re-Center Button */}
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            border: '2px solid #eee',
+            cursor: 'pointer',
+          }}
+          onClick={() => {
+            mapRef.current?.flyTo({
+              center: [position.lng, position.lat],
+              zoom: 16,
+              duration: 1500,
+            });
+          }}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v8" />
+            <path d="M8 12h8" />
+          </svg>
+        </div>
+      </div>
     )}
 
     {/* Bottom Sheet */}
