@@ -454,68 +454,84 @@ useLayoutEffect(() => {
 
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-    {/* Full-screen Map */}
-    <Map
-      ref={mapRef}
-      initialViewState={{
-        latitude: destination.lat,
-        longitude: destination.lng,
-        zoom: 12,
-      }}
-      style={{ width: '100%', height: '100%' }}
-      mapStyle="mapbox://styles/mapbox/streets-v12"
-      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-    >
-{tracking && position && (
-  <Marker
-    longitude={position.lng}
-    latitude={position.lat}
-    anchor="center"
-    rotationAlignment="map"
-    rotation={position.heading ?? 0}  // Rotates arrow based on heading
-  >
-    <div
-      style={{
-        width: '40px',
-        height: '40px',
-        background: 'cyan',
-        border: '5px solid white',
-        borderRadius: '50% 50% 50% 0',
-        transform: 'rotate(-45deg)',  // Creates arrow shape (point forward)
-        boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
-      }}
-    />
-  </Marker>
-)}
-      {/* Red Destination Pin */}
-      <Marker longitude={destination.lng} latitude={destination.lat}>
-        <div
-          style={{
-            width: '24px',
-            height: '24px',
-            background: 'red',
-            border: '4px solid white',
-            borderRadius: '50%',
-            boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
-          }}
-        />
-      </Marker>
+    {/* Client-side only rendering for Mapbox components */}
+    {typeof window !== 'undefined' ? (
+      <Map
+        ref={mapRef}
+        initialViewState={{
+          latitude: destination.lat,
+          longitude: destination.lng,
+          zoom: 12,
+        }}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+      >
+        {/* Cyan Arrow Marker */}
+        {tracking && position && (
+          <Marker
+            longitude={position.lng}
+            latitude={position.lat}
+            anchor="center"
+            rotationAlignment="map"
+            rotation={position.heading ?? 0}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                background: 'cyan',
+                border: '5px solid white',
+                borderRadius: '50% 50% 50% 0',
+                transform: 'rotate(-45deg)',
+                boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
+              }}
+            />
+          </Marker>
+        )}
 
-        {/* ← ADD THE BLUE ROUTE LINE HERE */}
+        {/* Red Destination Pin — NOW INSIDE THE GUARD */}
+        <Marker longitude={destination.lng} latitude={destination.lat}>
+          <div
+            style={{
+              width: '24px',
+              height: '24px',
+              background: 'red',
+              border: '4px solid white',
+              borderRadius: '50%',
+              boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
+            }}
+          />
+        </Marker>
+
+        {/* Blue Route Line — ALSO INSIDE */}
         {route && (
-            <Source id="route" type="geojson" data={route}>
+          <Source id="route" type="geojson" data={route}>
             <Layer
-                id="route-line"
-                type="line"
-                paint={{
+              id="route-line"
+              type="line"
+              paint={{
                 'line-color': '#3887be',
                 'line-width': 6,
                 'line-opacity': 0.8,
-                }}
+              }}
             />
-            </Source>
+          </Source>
         )}
-        </Map>
+      </Map>
+    ) : (
+      <div style={{ 
+        height: '100%', 
+        background: '#1a202c', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        color: 'white', 
+        fontSize: '20px' 
+      }}>
+        Loading map...
+      </div>
+    )}
 
     {/* Floating Controls: 3D Toggle + Orientation Toggle + Re-Center */}
     {tracking && position && sheetSnap !== 0 && (
@@ -598,16 +614,16 @@ return (
       </div>
     )}
 
-    {/* Bottom Sheet */}
+ {/* Bottom Sheet */}
     <Sheet
-    ref={sheetRef}
-    isOpen={true}
-    onClose={() => {}}
-    snapPoints={[0, 0.15, 0.6, 1]}  // Fixed: ascending with 0 and 1
-    initialSnap={1}  // Start at peek (0.15)
-    onSnap={(index) => setSheetSnap(index)}
-    disableDismiss={true}
-    disableDrag={false}
+      ref={sheetRef}
+      isOpen={true}
+      onClose={() => {}}
+      snapPoints={[0.6, 0.15]}
+      initialSnap={1}
+      onSnap={(index) => setSheetSnap(index)}
+      disableDismiss={true}
+      disableDrag={false}
     >
   <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
@@ -940,27 +956,26 @@ return (
   <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
 </Sheet>
   
-    {/* Global Style for Touch Pass-Through */}
-        <style jsx global>{`
-        .react-modal-sheet-backdrop {
-            pointer-events: none !important;
-        }
-        .react-modal-sheet-container {
-            pointer-events: none !important;
-        }
-        .react-modal-sheet-content > div {
-            pointer-events: auto !important;
-        }
-        `}</style>
+{/* Global Styles & Animations */}
+    <style jsx global>{`
+      .react-modal-sheet-backdrop {
+        pointer-events: none !important;
+      }
+      .react-modal-sheet-container {
+        pointer-events: none !important;
+      }
+      .react-modal-sheet-content > div {
+        pointer-events: auto !important;
+      }
+    `}</style>
 
-        {/* Pulse Animation */}
-        <style jsx>{`
-        @keyframes pulse {
+    <style jsx>{`
+          @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
-        }
+          }
         `}</style>
-    </div>
+      </div>
     );
   }
