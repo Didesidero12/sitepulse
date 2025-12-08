@@ -1,13 +1,11 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
 import mbxClient from '@mapbox/mapbox-sdk';
 import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
-import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
