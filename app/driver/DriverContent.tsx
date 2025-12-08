@@ -22,6 +22,7 @@ export default function DriverContent() {
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
+  const [mapLoaded, setMapLoaded] = useState(false);  // ← ADD THIS LINE
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -255,6 +256,11 @@ useEffect(() => {
   }
 }, [tracking]);
 
+//Add the UseEffect to Set mapLoaded to True
+useEffect(() => {
+  setMapLoaded(true);
+}, []);
+
 // UseEffect (Realtime Ticket Listener)
 useEffect(() => {
   const ticketId = searchParams.get('ticketId');
@@ -455,7 +461,7 @@ useLayoutEffect(() => {
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
     {/* Client-side only rendering for Mapbox components */}
-    {typeof window !== 'undefined' ? (
+    {mapLoaded ? (
       <Map
         ref={mapRef}
         initialViewState={{
@@ -490,7 +496,7 @@ return (
           </Marker>
         )}
 
-        {/* Red Destination Pin — NOW INSIDE THE GUARD */}
+        {/* Red Destination Pin */}
         <Marker longitude={destination.lng} latitude={destination.lat}>
           <div
             style={{
@@ -504,7 +510,7 @@ return (
           />
         </Marker>
 
-        {/* Blue Route Line — ALSO INSIDE */}
+        {/* Blue Route Line */}
         {route && (
           <Source id="route" type="geojson" data={route}>
             <Layer
