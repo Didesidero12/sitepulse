@@ -379,79 +379,7 @@ useEffect(() => {
   }
 }, [tracking]);
 
-// Rotate map when heading-up mode is active
-useEffect(() => {
-  if (!mapRef.current || !tracking || !position) return;
 
-  if (headingUp && position.heading !== undefined && position.heading !== null) {
-    mapRef.current.easeTo({
-      bearing: position.heading,
-      duration: 1000,
-      essential: true,
-    });
-  } else {
-    mapRef.current.easeTo({
-      bearing: 0,
-      duration: 1000,
-      essential: true,
-    });
-  }
-}, [headingUp, position?.heading, tracking]);
-
-useEffect(() => {
-  if (!mapRef.current || !tracking || !position) return;
-
-  const center = [position.lng, position.lat];
-  const bearing = cameraMode !== 'north-up' ? (position.heading ?? 0) : 0;
-  const pitch = cameraMode === '3d-heading-up' ? 60 : 0;
-
-  mapRef.current.easeTo({
-    center,
-    zoom: 16,
-    bearing,
-    pitch,
-    duration: 1500,
-    essential: true,
-  });
-
-  // Terrain & 3D buildings (from Step 5)
-  if (pitch > 0) {
-    // Add terrain and buildings code from Step 5 here
-    if (!mapRef.current.getSource('mapbox-dem')) {
-      mapRef.current.addSource('mapbox-dem', {
-        type: 'raster-dem',
-        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-        tileSize: 512,
-      });
-      mapRef.current.setTerrain({
-        source: 'mapbox-dem',
-        exaggeration: 1.5,
-      });
-    }
-
-    if (!mapRef.current.getLayer('3d-buildings')) {
-      mapRef.current.addLayer({
-        id: '3d-buildings',
-        source: 'composite',
-        'source-layer': 'building',
-        filter: ['==', 'extrude', 'true'],
-        type: 'fill-extrusion',
-        minzoom: 15,
-        paint: {
-          'fill-extrusion-color': '#aaa',
-          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'height']],
-          'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'min_height']],
-          'fill-extrusion-opacity': 0.6,
-        },
-      });
-    }
-  } else {
-    mapRef.current.setTerrain(null);
-    if (mapRef.current.getLayer('3d-buildings')) {
-      mapRef.current.removeLayer('3d-buildings');
-    }
-  }
-}, [cameraMode, position, tracking]);
 
 //UseEffect to limit alert for 15 sec on screen
 useLayoutEffect(() => {
