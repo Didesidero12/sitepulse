@@ -35,6 +35,8 @@ export default function DriverContent() {
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
   const [instructions, setInstructions] = useState<string[]>([]);
   const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
+  const [hasStartedNavigation, setHasStartedNavigation] = useState(false);
+  const [is3D, setIs3D] = useState(false);  // false = 2D, true = 3D
 
   // Notification State
   const [notified30Min, setNotified30Min] = useState(false);
@@ -345,6 +347,100 @@ useEffect(() => {
   }
 }, [tracking, position]);
 
+// Rotate map when heading-up mode is active
+useEffect(() => {
+  if (!mapRef.current || !tracking || !position) return;
+
+  if (headingUp && position.heading !== undefined && position.heading !== null) {
+    mapRef.current.easeTo({
+      bearing: position.heading,
+      duration: 1000,
+      essential: true,
+    });
+  } else {
+    mapRef.current.easeTo({
+      bearing: 0,
+      duration: 1000,
+      essential: true,
+    });
+  }
+}, [headingUp, position?.heading, tracking]);
+
+// 3D View Toggle — Tilt + Terrain + Extruded Buildings
+useEffect(() => {
+  if (!mapRef.current) return;
+
+  if (is3D) {
+    // Enable 3D mode
+    mapRef.current.easeTo({
+      pitch: 60,      // Tilted view
+      duration: 1500,
+    });
+
+    // Add terrain for elevation (hills, valleys)
+    if (!mapRef.current.getSource('mapbox-dem')) {
+      mapRef.current.addSource('mapbox-dem', {
+        type: 'raster-dem',
+        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        tileSize: 512,
+      });
+      mapRef.current.setTerrain({
+        source: 'mapbox-dem',
+        exaggeration: 1.5,  // Height exaggeration
+      });
+    }
+
+    // Extrude buildings for 3D city effect
+    if (!mapRef.current.getLayer('3d-buildings')) {
+      mapRef.current.addLayer({
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 14,
+        paint: {
+          'fill-extrusion-color': '#aaa',
+          'fill-extrusion-height': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            14,
+            0,
+            14.05,
+            ['get', 'height']
+          ],
+          'fill-extrusion-base': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            14,
+            0,
+            14.05,
+            ['get', 'min_height']
+          ],
+          'fill-extrusion-opacity': 0.8,
+        },
+      });
+    }
+  } else {
+    // Back to 2D
+    mapRef.current.easeTo({
+      pitch: 0,
+      duration: 1500,
+    });
+
+    // Remove terrain
+    mapRef.current.setTerrain(null);
+
+    // Remove 3D buildings
+    if (mapRef.current.getLayer('3d-buildings')) {
+      mapRef.current.removeLayer('3d-buildings');
+    }
+  }
+}, [is3D]);
+
+//UseEffect to limit alert for 15 sec on screen
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
     requestAnimationFrame(() => {
@@ -418,9 +514,33 @@ return (
         )}
         </Map>
 
-    {/* Floating Controls: Orientation Toggle + Re-Center */}
+    {/* Floating Controls: 3D Toggle + Orientation Toggle + Re-Center */}
     {tracking && position && sheetSnap !== 0 && (
       <div style={{ position: 'absolute', bottom: '180px', right: '16px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 2000 }}>
+        {/* 3D Toggle Button */}
+        <div
+          style={{
+            background: is3D ? '#2563eb' : 'white',
+            color: is3D ? 'white' : '#333',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            border: '2px solid #eee',
+            cursor: 'pointer',
+          }}
+          onClick={() => setIs3D(!is3D)}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 2l-10 10h4v10h12v-10h4l-10-10z" />
+            <path d="M12 8v8" />
+            <path d="M8 12h8" />
+          </svg>
+        </div>
+
         {/* Orientation Toggle Button */}
         <div
           style={{
