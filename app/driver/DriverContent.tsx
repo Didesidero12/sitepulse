@@ -366,21 +366,6 @@ useEffect(() => {
   }
 }, [tracking, position]);
 
-// On tracking start — immediately center on driver (prevents red pin lock)
-useEffect(() => {
-  if (tracking && mapRef.current) {
-    // Use current position if we have it, otherwise fallback to Kennewick
-    const center = position || destination;
-    mapRef.current.flyTo({
-      center: [center.lng, center.lat],
-      zoom: 16,
-      duration: 2000,
-    });
-  }
-}, [tracking]);
-
-
-
 //UseEffect to limit alert for 15 sec on screen
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
