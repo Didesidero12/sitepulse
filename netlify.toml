@@ -6,3 +6,7 @@
 [build.environment]
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
+
+# Official Next.js plugin for Netlify — handles large bundles correctly
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
