@@ -475,11 +475,6 @@ return (
     {mapLoaded ? (
       <Map
         ref={mapRef}
-        initialViewState={{
-          latitude: destination.lat,
-          longitude: destination.lng,
-          zoom: 12,
-        }}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
