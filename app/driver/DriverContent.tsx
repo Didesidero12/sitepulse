@@ -12,7 +12,8 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, getDocs, query, where, collection } from 'firebase/firestore';
 
 import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
-import { Ticket, MapboxRoute } from '@/lib/types';  // ← THIS LINE
+import type { MapRef } from 'react-map-gl';  // ← THIS LINE WAS MISSING
+import { Ticket, MapboxRoute } from '@/lib/types';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
