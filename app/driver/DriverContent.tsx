@@ -550,7 +550,7 @@ return (
     ref={sheetRef}
     isOpen={true}
     onClose={() => {}}
-    snapPoints={[0, 0.15, 0.6, 1]}  // Fixed: ascending with 0 and 1
+    snapPoints={[0, 0.2, 0.6, 1]}  // Fixed: ascending with 0 and 1
     initialSnap={2}  // → now starts at 0.6 (60%) → perfect height
     onSnap={(index) => setSheetSnap(index)}
     disableDismiss={true}
@@ -594,6 +594,8 @@ return (
           </p>
         )}
       </div>
+
+
 
  {/* Stop / Arrival Button Flow — NOW WITH FULL CLEANUP */}
 {showArrivalConfirm ? (
@@ -752,53 +754,57 @@ return (
   </div>
 )}
 
-        {/* Pre-Tracking Content - Only Visible When Not Tracking */}
-        {!tracking && (
+      {/* TICKET SUMMARY — ALWAYS VISIBLE */}
+      {true && (   // ← changed from {!tracking && (}
           <>
             <h2 style={{ margin: '8px 0 4px', fontSize: '18px', fontWeight: 'bold' }}>Driver Navigation</h2>
             <p style={{ color: '#666', margin: '0 0 16px', fontSize: '14px' }}>
               Tap below to begin tracking and navigation
             </p>
 
-        {/* Trip Summary Card (Pre-Tracking) */}
-        <div style={{
-        background: '#f3f4f6',
-        borderRadius: '12px',
-        padding: '16px',
-        marginBottom: '16px'
-        }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
+{!tracking && (
+  <>
+    {/* Trip Summary Card (Pre-Tracking) */}
+    <div style={{
+      background: '#f3f4f6',
+      borderRadius: '12px',
+      padding: '16px',
+      marginBottom: '16px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
             {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
-            </p>
-            <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
-                {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
-            </p>
-            </div>
-            <button
-            onClick={() => {
-                if (claimed) {
-                console.log('Start button clicked — setting tracking to true');
-                setTracking(true);
-                }
-            }}
-            disabled={!claimed}
-            style={{
-                padding: '10px 20px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                color: 'white',
-                background: claimed ? '#16a34a' : '#d1d5db',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: claimed ? 'pointer' : 'not-allowed',
-            }}
-            >
-            Start
-            </button>
+          </p>
+          <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
+            {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
+          </p>
         </div>
-        </div>
+        <button
+          onClick={() => {
+            if (claimed) {
+              console.log('Start button clicked — setting tracking to true');
+              setTracking(true);
+            }
+          }}
+          disabled={!claimed}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: 'white',
+            background: claimed ? '#16a34a' : '#d1d5db',
+            border: 'none',
+            borderRadius: '20px',
+            cursor: claimed ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Start
+        </button>
+      </div>
+    </div>
+  </>
+)}
 
 {/* Ticket Summary + Claim Button — Dynamic from Real Ticket */}
 <div style={{
