@@ -411,12 +411,6 @@ useEffect(() => {
     });
   }, [position, cameraMode, tracking]);
 
-  {/* Auto-remove loading screen after 4 seconds even if onLoad never fires */}
-      {useEffect(() => {
-        const timer = setTimeout(() => setMapLoaded(true), 4000);
-        return () => clearTimeout(timer);
-      }, [])}
-
   // FIX: Handle Start - immediate snap to position with essential priority
 useEffect(() => {
     if (tracking && mapRef.current && position) {
