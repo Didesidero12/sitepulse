@@ -23,7 +23,6 @@ export default function DriverContent() {
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
   const [mapLoaded, setMapLoaded] = useState(false);  // ← ADD THIS LINE
-  const [cameraMode, setCameraMode] = useState('north-up');  // 'north-up', 'heading-up', '3d-heading-up'
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -251,6 +250,7 @@ useEffect(() => {
     return () => {
       navigator.geolocation.clearWatch(watchId);
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
     };
   }
 }, [tracking]);
@@ -355,6 +355,99 @@ useEffect(() => {
   }
 }, [tracking, position]);
 
+// Rotate map when heading-up mode is active
+useEffect(() => {
+  if (!mapRef.current || !tracking || !position) return;
+
+  if (headingUp && position.heading !== undefined && position.heading !== null) {
+    mapRef.current.easeTo({
+      bearing: position.heading,
+      duration: 1000,
+      essential: true,
+    });
+  } else {
+    mapRef.current.easeTo({
+      bearing: 0,
+      duration: 1000,
+      essential: true,
+    });
+  }
+}, [headingUp, position?.heading, tracking]);
+
+// 3D View Toggle — Tilt + Terrain + Extruded Buildings
+useEffect(() => {
+  if (!mapRef.current) return;
+
+  if (is3D) {
+    // Enable 3D mode
+    mapRef.current.easeTo({
+      pitch: 60,      // Tilted view
+      duration: 1500,
+    });
+
+    // Add terrain for elevation (hills, valleys)
+    if (!mapRef.current.getSource('mapbox-dem')) {
+      mapRef.current.addSource('mapbox-dem', {
+        type: 'raster-dem',
+        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        tileSize: 512,
+      });
+      mapRef.current.setTerrain({
+        source: 'mapbox-dem',
+        exaggeration: 1.5,  // Height exaggeration
+      });
+    }
+
+    // Extrude buildings for 3D city effect
+    if (!mapRef.current.getLayer('3d-buildings')) {
+      mapRef.current.addLayer({
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 14,
+        paint: {
+          'fill-extrusion-color': '#aaa',
+          'fill-extrusion-height': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            14,
+            0,
+            14.05,
+            ['get', 'height']
+          ],
+          'fill-extrusion-base': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            14,
+            0,
+            14.05,
+            ['get', 'min_height']
+          ],
+          'fill-extrusion-opacity': 0.8,
+        },
+      });
+    }
+  } else {
+    // Back to 2D
+    mapRef.current.easeTo({
+      pitch: 0,
+      duration: 1500,
+    });
+
+    // Remove terrain
+    mapRef.current.setTerrain(null);
+
+    // Remove 3D buildings
+    if (mapRef.current.getLayer('3d-buildings')) {
+      mapRef.current.removeLayer('3d-buildings');
+    }
+  }
+}, [is3D]);
+
 //UseEffect to limit alert for 15 sec on screen
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
@@ -370,6 +463,11 @@ return (
     {mapLoaded ? (
       <Map
         ref={mapRef}
+        initialViewState={{
+          latitude: destination.lat,
+          longitude: destination.lng,
+          zoom: 12,
+        }}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
@@ -440,20 +538,14 @@ return (
       </div>
     )}
 
-    {/* Single Cycle Button: North-up → Heading-up → 3D Heading-up */}
+    {/* Floating Controls: 3D Toggle + Orientation Toggle + Re-Center */}
     {tracking && position && sheetSnap !== 0 && (
-      <>
-        {/* Cycle Button (top) */}
+      <div style={{ position: 'absolute', bottom: '180px', right: '16px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 2000 }}>
+        {/* 3D Toggle Button */}
         <div
           style={{
-            position: 'absolute',
-            bottom: '320px',   // Higher than re-center
-            right: '16px',
-            background:
-              cameraMode === 'north-up' ? 'white' :
-              cameraMode === 'heading-up' ? '#2563eb' :
-              '#7c3aed',  // Purple for 3D
-            color: cameraMode === 'north-up' ? '#333' : 'white',
+            background: is3D ? '#2563eb' : 'white',
+            color: is3D ? 'white' : '#333',
             borderRadius: '50%',
             width: '56px',
             height: '56px',
@@ -463,41 +555,42 @@ return (
             boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
             border: '2px solid #eee',
             cursor: 'pointer',
-            zIndex: 2000,
           }}
-          onClick={() => {
-            if (cameraMode === 'north-up') setCameraMode('heading-up');
-            else if (cameraMode === 'heading-up') setCameraMode('3d-heading-up');
-            else setCameraMode('north-up');
-          }}
+          onClick={() => setIs3D(!is3D)}
         >
-          {/* Icon changes per mode */}
-          {cameraMode === 'north-up' && (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 2v20" />
-            </svg>
-          )}
-          {cameraMode === 'heading-up' && (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 2L2 12h3v8h14v-8h3L12 2z" />
-              <path d="M12 8v8" />
-            </svg>
-          )}
-          {cameraMode === '3d-heading-up' && (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 2l-10 10h4v10h12v-10h4l-10-10z" />
-              <path d="M8 8l4 4 4-4" />
-            </svg>
-          )}
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 2l-10 10h4v10h12v-10h4l-10-10z" />
+            <path d="M12 8v8" />
+            <path d="M8 12h8" />
+          </svg>
         </div>
 
-        {/* Re-Center Button (unchanged) */}
+        {/* Orientation Toggle Button */}
         <div
           style={{
-            position: 'absolute',
-            bottom: '240px',
-            right: '16px',
+            background: headingUp ? '#2563eb' : 'white',
+            color: headingUp ? 'white' : '#333',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            border: '2px solid #eee',
+            cursor: 'pointer',
+          }}
+          onClick={() => setHeadingUp(!headingUp)}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 2L2 12h3v8h14v-8h3L12 2z" />
+            <path d="M12 8v8" />
+          </svg>
+        </div>
+
+        {/* Re-Center Button */}
+        <div
+          style={{
             background: 'white',
             borderRadius: '50%',
             width: '56px',
@@ -508,7 +601,6 @@ return (
             boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
             border: '2px solid #eee',
             cursor: 'pointer',
-            zIndex: 2000,
           }}
           onClick={() => {
             mapRef.current?.flyTo({
@@ -524,7 +616,7 @@ return (
             <path d="M8 12h8" />
           </svg>
         </div>
-      </>
+      </div>
     )}
 
  {/* Bottom Sheet */}
