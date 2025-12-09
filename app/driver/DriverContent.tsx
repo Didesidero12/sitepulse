@@ -14,14 +14,6 @@ import dynamic from 'next/dynamic';
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
 export default function DriverContent() {
-  const [viewState, setViewState] = useState({
-    longitude: -119.22323,
-    latitude: 46.21667,
-    zoom: 10,
-    pitch: 0,
-    bearing: 0,
-  });
-
   // UI & Tracking State
   const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
@@ -203,43 +195,53 @@ export default function DriverContent() {
     return () => unsubscribe();
   }, [searchParams]);
 
-  useEffect(() => {
-    if (tracking) {
-      console.log('GPS useEffect triggered — starting watchPosition');
+useEffect(() => {
+  if (tracking) {
+    console.log('GPS useEffect triggered — starting watchPosition');
 
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const newPos = { 
-            lat: pos.coords.latitude, 
-            lng: pos.coords.longitude,
-            heading: pos.coords.heading ?? undefined
-          };
-          console.log('GPS success — new position + heading:', newPos);
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newPos = { 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading ?? undefined 
+        };
 
-          if (position) {
-            animateMarker(position, newPos);
-          } else {
-            setPosition(newPos);
-          }
+        // Smooth dot animation
+        if (position) {
+          animateMarker(position, newPos);
+        } else {
+          setPosition(newPos);
+        }
 
-          targetPosition = newPos;
+        targetPosition = newPos;
 
-          // FIX: Removed conflicting flyTo here — centralized camera handles it now
-        },
-        (err) => {
-          console.error("GPS Error:", err);
-          alert("Location access denied or unavailable");
-          setTracking(false);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
+        // THIS IS THE FIX — ADD THIS BLOCK
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [newPos.lng, newPos.lat],
+            zoom: 16,
+            duration: 1500,
+            essential: true,
+          });
+        }
+        // END OF FIX
 
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      };
-    }
-  }, [tracking]);
+      },
+      (err) => {
+        console.error("GPS Error:", err);
+        alert("Location access denied or unavailable");
+        setTracking(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }
+}, [tracking]);
 
   // FIX: Removed duplicate/old "On Start" useEffect — centralized one handles it
 
@@ -305,7 +307,7 @@ export default function DriverContent() {
   }, [tracking, position]);
 
   // Centralized camera control
-  useEffect(() => {
+useEffect(() => {
     if (!mapRef.current || !tracking || !position) return;
 
     const map = mapRef.current.getMap();
@@ -324,14 +326,12 @@ export default function DriverContent() {
     }
 
     map.easeTo({
-      center: [lng, lat],
-      zoom: 16,
       bearing,
       pitch,
-      duration: 1000,
+      duration: 500, // Shorter to not conflict with flyTo
       essential: true,
     });
-  }, [position, cameraMode, tracking]);
+  }, [cameraMode, tracking]); // Trigger only on mode change, not position
 
   // Initial snap on Start
   useEffect(() => {
@@ -348,27 +348,47 @@ export default function DriverContent() {
     }
   }, [tracking, position]);
 
-  // FIX: Force resize on load to prevent blank canvas
-  useEffect(() => {
+  // ADD THIS — fixes blank screen on rotate/orientation change
+useEffect(() => {
+  const handleResize = () => {
     if (mapRef.current) {
-      const map = mapRef.current.getMap();
-      if (map) {
-        map.resize();  // Triggers WebGL redraw
-      }
+      mapRef.current.getMap()?.resize();
     }
-  }, [viewState]);  // Runs on any view change/move
+  };
+
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', handleResize);
+
+  return () => {
+    window.removeEventListener('resize', handleResize);
+    window.removeEventListener('orientationchange', handleResize);
+  };
+}, []);
+
+// Resize on window events for blank fix
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.getMap().resize();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <Map
         ref={mapRef}
-        {...viewState}
-        onMove={(evt) => setViewState(evt.viewState)}
+        initialViewState={{ // FIX: Use uncontrolled like older
+          latitude: destination.lat,
+          longitude: destination.lng,
+          zoom: 12,
+        }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        reuseMaps
-        antialias={true}  // FIX: Prevents blank on move/reload
         dragPan={!tracking}
         dragRotate={!tracking}
         scrollZoom={!tracking}
@@ -377,51 +397,18 @@ export default function DriverContent() {
         doubleClickZoom={!tracking}
       >
         {tracking && position && (
-          <Marker
-            longitude={position.lng}
-            latitude={position.lat}
-            anchor="center"
-            rotationAlignment="map"
-            rotation={position.heading ?? 0}
-          >
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                background: 'cyan',
-                border: '5px solid white',
-                borderRadius: '50% 50% 50% 0',
-                transform: 'rotate(-45deg)',
-                boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
-              }}
-            />
+          <Marker longitude={position.lng} latitude={position.lat} anchor="center" rotation={position.heading ?? 0} rotationAlignment="map">
+            <div style={{ width: '40px', height: '40px', background: 'cyan', border: '5px solid white', borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)', boxShadow: '0 0 25px rgba(0,255,255,0.9)' }} />
           </Marker>
         )}
 
         <Marker longitude={destination.lng} latitude={destination.lat}>
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              background: 'red',
-              border: '4px solid white',
-              borderRadius: '50%',
-              boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
-            }}
-          />
+          <div style={{ width: '24px', height: '24px', background: 'red', border: '4px solid white', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,0,0,0.6)' }} />
         </Marker>
 
         {route && (
           <Source id="route" type="geojson" data={route}>
-            <Layer
-              id="route-line"
-              type="line"
-              paint={{
-                'line-color': '#3887be',
-                'line-width': 6,
-                'line-opacity': 0.8,
-              }}
-            />
+            <Layer id="route-line" type="line" paint={{ 'line-color': '#3887be', 'line-width': 6, 'line-opacity': 0.8 }} />
           </Source>
         )}
       </Map>
