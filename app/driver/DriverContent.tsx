@@ -12,7 +12,7 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, getDocs, query, where, collection } from 'firebase/firestore';
 
 import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
-import type { MapRef } from 'react-map-gl';  // ← THIS LINE WAS MISSING
+import type { Map as MapboxMap } from 'mapbox-gl';
 import { Ticket, MapboxRoute } from '@/lib/types';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
@@ -59,7 +59,7 @@ export default function DriverContent() {
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
-  const mapRef = useRef<MapRef>(null); // proper Mapbox ref
+  const mapRef = useRef<MapboxMap | null>(null);
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
