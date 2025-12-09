@@ -59,7 +59,7 @@ export default function DriverContent() {
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
-  const mapRef = useRef<MapboxMap | null>(null);
+  const mapRef = useRef<any>(null);  // YES — use `any` here
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
