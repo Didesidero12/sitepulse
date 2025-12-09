@@ -394,12 +394,12 @@ useEffect(() => {
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        dragPan={!position}           // only lock after first GPS arrives
-        dragRotate={!position}
-        scrollZoom={!position}
-        touchZoomRotate={!position}
-        keyboard={!tracking}
-        doubleClickZoom={!tracking}
+        // dragPan={!position}           // only lock after first GPS arrives
+        // dragRotate={!position}
+        // scrollZoom={!position}
+        // touchZoomRotate={!position}
+        // keyboard={!tracking}
+        // doubleClickZoom={!tracking}
       >
         {tracking && position && (
           <Marker longitude={position.lng} latitude={position.lat} anchor="center" rotation={position.heading ?? 0} rotationAlignment="map">
