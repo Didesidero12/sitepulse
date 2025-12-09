@@ -1,6 +1,8 @@
 // lib/types.ts
-// lib/types.ts — ADD THIS
+import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
+
 export type MapboxRoute = DirectionsResponse['routes'][number];
+
 export interface Ticket {
   id: string;
   shortId?: string;
@@ -24,5 +26,4 @@ export interface Ticket {
   driverProposedTime?: string;
   gcNotified30min?: boolean;
   gcNotified5min?: boolean;
-  // add more later as needed
 }
