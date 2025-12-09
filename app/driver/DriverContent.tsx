@@ -11,6 +11,7 @@ import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getDoc, getDocs, query, where, collection } from 'firebase/firestore';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -149,36 +150,6 @@ const formatDuration = (minutes: number | null) => {
     return dist < 75;  // ~75 meters = arrived
   };
 
-    //Ticket Listener
-    useEffect(() => {
-  const ticketId = searchParams.get('ticketId');
-  if (!ticketId) {
-    setLoadingTicket(false);
-    return;
-  }
-
-  const ticketRef = doc(db, 'tickets', ticketId);
-  const unsubscribe = onSnapshot(
-    ticketRef,
-    (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setTicket(data);
-        console.log('Real ticket loaded:', data); // Debug
-      } else {
-        console.warn('No ticket found with ID:', ticketId);
-      }
-      setLoadingTicket(false);
-    },
-    (error) => {
-      console.error('Error loading ticket:', error);
-      setLoadingTicket(false);
-    }
-  );
-
-  return () => unsubscribe();
-}, [searchParams]);
-
 useEffect(() => {
   if (!tracking) return;
 
@@ -280,30 +251,60 @@ useEffect(() => {
   // Cleanup not needed — we want it locked until Stop
 }, [hasFirstFix]);
 
-// UseEffect (Realtime Ticket Listener)
+// TICKET LOADING — RESOLVES shortId OR real ticketId, THEN REALTIME LISTEN
 useEffect(() => {
-  const ticketId = searchParams.get('ticketId');
-  if (!ticketId) {
+  const rawId = searchParams.get('ticketId');
+  if (!rawId) {
     setLoadingTicket(false);
     return;
   }
 
-  const ticketRef = doc(db, 'tickets', ticketId);
-  const unsubscribe = onSnapshot(ticketRef, (doc) => {
-    if (doc.exists()) {
-      const data = doc.data();
-      setTicket(data);
-      console.log('Ticket loaded:', data);
-    } else {
-      console.log('No such ticket!');
-    }
-    setLoadingTicket(false);
-  }, (error) => {
-    console.error('Ticket load error:', error);
-    setLoadingTicket(false);
-  });
+  let unsubscribe: (() => void) | undefined;
 
-  return unsubscribe;
+  const resolveAndListen = async () => {
+    let resolvedId = rawId;
+
+    // Step 1: Try direct load (real Firestore ID)
+    const directSnap = await getDoc(doc(db, 'tickets', rawId));
+    if (!directSnap.exists()) {
+      // Step 2: If not, assume shortId and query
+      const q = query(collection(db, 'tickets'), where('shortId', '==', rawId));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        resolvedId = snap.docs[0].id;
+      } else {
+        console.warn('No ticket found for ID/shortId:', rawId);
+        setLoadingTicket(false);
+        return;
+      }
+    }
+
+    // Step 3: Now listen realtime on resolved ID
+    const ticketRef = doc(db, 'tickets', resolvedId);
+    unsubscribe = onSnapshot(
+      ticketRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTicket({ id: docSnap.id, ...data });
+          console.log('Real ticket loaded:', data);
+        } else {
+          console.warn('Ticket disappeared:', resolvedId);
+        }
+        setLoadingTicket(false);
+      },
+      (error) => {
+        console.error('Error loading ticket:', error);
+        setLoadingTicket(false);
+      }
+    );
+  };
+
+  resolveAndListen();
+
+  return () => {
+    if (unsubscribe) unsubscribe();
+  };
 }, [searchParams]);
 
 // Dynamic destination from ticket — supports GC mid-route changes
@@ -742,11 +743,9 @@ return (
         marginTop: '12px',
       }}>
         ⚠️ <strong>
-          {ticket?.equipmentNeeded 
-            ? `${ticket.equipmentNeeded} Alert` 
-            : ticket?.needsForklift 
-              ? 'Forklift Alert' 
-              : 'Site Assistance Required'}
+          {ticket?.loadingEquipment 
+            ? `${ticket.loadingEquipment} Alert` 
+            : 'Site Assistance Required'}
         </strong>: Heavy machinery active on site — stay vigilant!
       </div>
     )}
@@ -801,76 +800,70 @@ return (
         </div>
         </div>
 
-      {/* Ticket Summary + Claim Button — Dynamic from Real Ticket */}
-      <div style={{
-        background: '#f3f4f6',
-        borderRadius: '12px',
-        padding: '12px',
-        fontSize: '14px',
-        color: '#333',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-      }}>
-        <div>
-          <p style={{ margin: '0 0 4px' }}>
-            <strong>Materials:</strong> {ticket?.material || 'Loading...'} ({ticket?.qty || ''})
-          </p>
-          <p style={{ margin: '0 0 4px' }}>
-            <strong>Forklift Needed:</strong> {ticket?.needsForklift ? 'Yes' : 'No'}
-          </p>
-          {ticket?.projectName && (
-            <p style={{ margin: '0 0 4px' }}>
-              <strong>Project:</strong> {ticket.projectName}
-            </p>
-          )}
-          {ticket?.projectAddress && (
-            <p style={{ margin: '0 0 4px' }}>
-              <strong>Address:</strong> {ticket.projectAddress}
-            </p>
-          )}
-          {ticket?.csiDivision && (
-            <p style={{ margin: '0 0 4px' }}>
-              <strong>CSI Division:</strong> {ticket.csiDivision}
-            </p>
-          )}
-          {ticket?.projectContacts && ticket.projectContacts.length > 0 && (
-            <div style={{ margin: '8px 0 0' }}>
-              <strong>Contacts:</strong>
-              <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
-                {ticket.projectContacts.map((contact: any, i: number) => (
-                  <li key={i}>
-                    {contact.name} ({contact.role}):{' '}
-                    <a href={`tel:${contact.phone}`} style={{ color: '#3b82f6' }}>
-                      {contact.phone}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => {
-            setClaimed(true);
-            // TODO: Real Firebase claim update in Brick 9
-          }}
-          disabled={claimed}
-          style={{
-            padding: '8px 16px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            color: 'white',
-            background: claimed ? '#d1d5db' : '#3b82f6',
-            border: 'none',
-            borderRadius: '20px',
-            alignSelf: 'flex-end',
-          }}
-        >
-          {claimed ? 'Claimed' : 'Claim Delivery'}
-        </button>
+{/* Ticket Summary + Claim Button — Dynamic from Real Ticket */}
+<div style={{
+  background: '#f3f4f6',
+  borderRadius: '12px',
+  padding: '12px',
+  fontSize: '14px',
+  color: '#333',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+}}>
+  <div>
+    <p style={{ margin: '0 0 4px' }}>
+      <strong>Materials:</strong> {ticket?.material || 'Loading...'} ({ticket?.qty || ''})
+    </p>
+    <p style={{ margin: '0 0 4px' }}>
+      <strong>CSI Division:</strong> {ticket?.csiDivision || 'N/A'}
+    </p>
+    <p style={{ margin: '0 0 4px' }}>
+      <strong>Project:</strong> {ticket?.projectName || 'N/A'}
+    </p>
+    <p style={{ margin: '0 0 4px' }}>
+      <strong>Address:</strong> {ticket?.projectAddress || 'N/A'}
+    </p>
+    <p style={{ margin: '0 0 4px' }}>
+      <strong>Equipment:</strong> {ticket?.loadingEquipment || 'None'}
+    </p>
+    {ticket?.projectContacts && ticket.projectContacts.length > 0 && (
+      <div style={{ margin: '8px 0 0' }}>
+        <strong>Contacts:</strong>
+        <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
+          {ticket.projectContacts.map((contact: any, i: number) => (
+            <li key={i}>
+              {contact.name} ({contact.role}):{' '}
+              <a href={`tel:${contact.phone}`} style={{ color: '#3b82f6' }}>
+                {contact.phone}
+              </a>
+            </li>
+          ))}
+        </ul>
       </div>
+    )}
+  </div>
+
+  <button
+    onClick={() => {
+      setClaimed(true);
+      // TODO: Real Firebase claim update
+    }}
+    disabled={claimed}
+    style={{
+      padding: '8px 16px',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      color: 'white',
+      background: claimed ? '#d1d5db' : '#3b82f6',
+      border: 'none',
+      borderRadius: '20px',
+      alignSelf: 'flex-end',
+    }}
+  >
+    {claimed ? 'Claimed' : 'Claim Delivery'}
+  </button>
+</div>
           </>
         )}
 
