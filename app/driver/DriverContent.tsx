@@ -1,15 +1,16 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
+import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
 import mbxClient from '@mapbox/mapbox-sdk';
 import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
+import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
-import dynamic from 'next/dynamic';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -17,11 +18,10 @@ export default function DriverContent() {
   // UI & Tracking State
   const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
-  const [position, setPosition] = useState<{ lat: number; lng: number; heading?: number } | null>(null);
+  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
-  const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -34,8 +34,6 @@ export default function DriverContent() {
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
   const [instructions, setInstructions] = useState<string[]>([]);
   const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
-  const [hasStartedNavigation, setHasStartedNavigation] = useState(false);
-  const [is3D, setIs3D] = useState(false);  // false = 2D, true = 3D
 
   // Notification State
   const [notified30Min, setNotified30Min] = useState(false);
@@ -48,8 +46,6 @@ export default function DriverContent() {
   // Refs
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
-  const Map = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Map), { ssr: false });
-  const Marker = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Marker), { ssr: false });
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
@@ -204,31 +200,17 @@ const formatDuration = (minutes: number | null) => {
   return () => unsubscribe();
 }, [searchParams]);
 
+    // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
   if (tracking) {
-    console.log('GPS useEffect triggered — starting watchPosition');
+    console.log('GPS useEffect triggered — starting watchPosition');  // Debug log
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const newPos = { 
-          lat: pos.coords.latitude, 
-          lng: pos.coords.longitude,
-          heading: pos.coords.heading ?? undefined  // ← Capture heading (null if unavailable)
-        };
-        console.log('GPS success — new position + heading:', newPos);
+        const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setPosition(newPos);
+        console.log('GPS success — new position:', newPos);  // Debug log
 
-        // Smooth animation if we have a previous position
-        if (position) {
-          animateMarker(position, newPos);
-        } else {
-          // First position — instant set
-          setPosition(newPos);
-        }
-
-        // Always update target for re-center button
-        targetPosition = newPos;
-
-        // Camera follow (smooth flyTo)
         if (mapRef.current) {
           mapRef.current.flyTo({
             center: [newPos.lng, newPos.lat],
@@ -247,8 +229,7 @@ useEffect(() => {
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      console.log('GPS useEffect cleanup — watch cleared');
+      console.log('GPS useEffect cleanup — watch cleared');  // Debug log
     };
   }
 }, [tracking]);
@@ -348,100 +329,6 @@ useEffect(() => {
   }
 }, [tracking, position]);
 
-// Rotate map when heading-up mode is active
-useEffect(() => {
-  if (!mapRef.current || !tracking || !position) return;
-
-  if (headingUp && position.heading !== undefined && position.heading !== null) {
-    mapRef.current.easeTo({
-      bearing: position.heading,
-      duration: 1000,
-      essential: true,
-    });
-  } else {
-    mapRef.current.easeTo({
-      bearing: 0,
-      duration: 1000,
-      essential: true,
-    });
-  }
-}, [headingUp, position?.heading, tracking]);
-
-// 3D View Toggle — Tilt + Terrain + Extruded Buildings
-useEffect(() => {
-  if (!mapRef.current) return;
-
-  if (is3D) {
-    // Enable 3D mode
-    mapRef.current.easeTo({
-      pitch: 60,      // Tilted view
-      duration: 1500,
-    });
-
-    // Add terrain for elevation (hills, valleys)
-    if (!mapRef.current.getSource('mapbox-dem')) {
-      mapRef.current.addSource('mapbox-dem', {
-        type: 'raster-dem',
-        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-        tileSize: 512,
-      });
-      mapRef.current.setTerrain({
-        source: 'mapbox-dem',
-        exaggeration: 1.5,  // Height exaggeration
-      });
-    }
-
-    // Extrude buildings for 3D city effect
-    if (!mapRef.current.getLayer('3d-buildings')) {
-      mapRef.current.addLayer({
-        id: '3d-buildings',
-        source: 'composite',
-        'source-layer': 'building',
-        filter: ['==', 'extrude', 'true'],
-        type: 'fill-extrusion',
-        minzoom: 14,
-        paint: {
-          'fill-extrusion-color': '#aaa',
-          'fill-extrusion-height': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            14,
-            0,
-            14.05,
-            ['get', 'height']
-          ],
-          'fill-extrusion-base': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            14,
-            0,
-            14.05,
-            ['get', 'min_height']
-          ],
-          'fill-extrusion-opacity': 0.8,
-        },
-      });
-    }
-  } else {
-    // Back to 2D
-    mapRef.current.easeTo({
-      pitch: 0,
-      duration: 1500,
-    });
-
-    // Remove terrain
-    mapRef.current.setTerrain(null);
-
-    // Remove 3D buildings
-    if (mapRef.current.getLayer('3d-buildings')) {
-      mapRef.current.removeLayer('3d-buildings');
-    }
-  }
-}, [is3D]);
-
-//UseEffect to limit alert for 15 sec on screen
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
     requestAnimationFrame(() => {
@@ -464,27 +351,22 @@ return (
       mapStyle="mapbox://styles/mapbox/streets-v12"
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
     >
-{tracking && position && (
-  <Marker
-    longitude={position.lng}
-    latitude={position.lat}
-    anchor="center"
-    rotationAlignment="map"
-    rotation={position.heading ?? 0}  // Rotates arrow based on heading
-  >
-    <div
-      style={{
-        width: '40px',
-        height: '40px',
-        background: 'cyan',
-        border: '5px solid white',
-        borderRadius: '50% 50% 50% 0',
-        transform: 'rotate(-45deg)',  // Creates arrow shape (point forward)
-        boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
-      }}
-    />
-  </Marker>
-)}
+      {/* Cyan Dot Marker */}
+      {tracking && position && (
+        <Marker longitude={position.lng} latitude={position.lat}>
+          <div
+            style={{
+              width: '28px',
+              height: '28px',
+              background: 'cyan',
+              border: '4px solid white',
+              borderRadius: '50%',
+              boxShadow: '0 0 20px rgba(0, 255, 255, 0.8)',
+              animation: 'pulse 2s infinite',
+            }}
+          />
+        </Marker>
+      )}
       {/* Red Destination Pin */}
       <Marker longitude={destination.lng} latitude={destination.lat}>
         <div
@@ -515,85 +397,37 @@ return (
         )}
         </Map>
 
-    {/* Floating Controls: 3D Toggle + Orientation Toggle + Re-Center */}
     {tracking && position && sheetSnap !== 0 && (
-      <div style={{ position: 'absolute', bottom: '180px', right: '16px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 2000 }}>
-        {/* 3D Toggle Button */}
-        <div
-          style={{
-            background: is3D ? '#2563eb' : 'white',
-            color: is3D ? 'white' : '#333',
-            borderRadius: '50%',
-            width: '56px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-            border: '2px solid #eee',
-            cursor: 'pointer',
-          }}
-          onClick={() => setIs3D(!is3D)}
-        >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M12 2l-10 10h4v10h12v-10h4l-10-10z" />
-            <path d="M12 8v8" />
-            <path d="M8 12h8" />
-          </svg>
-        </div>
-
-        {/* Orientation Toggle Button */}
-        <div
-          style={{
-            background: headingUp ? '#2563eb' : 'white',
-            color: headingUp ? 'white' : '#333',
-            borderRadius: '50%',
-            width: '56px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-            border: '2px solid #eee',
-            cursor: 'pointer',
-          }}
-          onClick={() => setHeadingUp(!headingUp)}
-        >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M12 2L2 12h3v8h14v-8h3L12 2z" />
-            <path d="M12 8v8" />
-          </svg>
-        </div>
-
-        {/* Re-Center Button */}
-        <div
-          style={{
-            background: 'white',
-            borderRadius: '50%',
-            width: '56px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-            border: '2px solid #eee',
-            cursor: 'pointer',
-          }}
-          onClick={() => {
-            mapRef.current?.flyTo({
-              center: [position.lng, position.lat],
-              zoom: 16,
-              duration: 1500,
-            });
-          }}
-        >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 8v8" />
-            <path d="M8 12h8" />
-          </svg>
-        </div>
-      </div>
+    <div
+        style={{
+        position: 'absolute',
+        bottom: '240px',  // High enough for all phones
+        right: '16px',
+        background: 'white',
+        borderRadius: '50%',
+        width: '56px',
+        height: '56px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        zIndex: 2000,
+        border: '2px solid #eee',
+        }}
+        onClick={() => {
+        mapRef.current?.flyTo({
+            center: [position.lng, position.lat],
+            zoom: 16,
+            duration: 1500,
+        });
+        }}
+    >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 8v8" />
+        <path d="M8 12h8" />
+        </svg>
+    </div>
     )}
 
     {/* Bottom Sheet */}
