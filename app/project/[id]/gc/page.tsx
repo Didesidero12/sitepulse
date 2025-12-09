@@ -117,20 +117,20 @@ const createQuickTicket = async () => {
     ],
   });
 
-  const shareUrl = `${window.location.origin}/ticket/${shortId}`;
+  const shareUrl = `${window.location.origin}/driver?ticketId=${shortId}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "SitePulse Delivery",
-          text: "Doors from Italy • 12 bifolds • Forklift needed",
+          title: "SitePulse — Delivery Ready",
+          text: "Doors from Italy • 12 bifolds • Forklift needed\nTap to start navigation →",
           url: shareUrl,
         });
       } catch (err) {
         console.log("Share cancelled");
       }
     } else {
-      // BULLETPROOF COPY — WORKS ON HTTP, HTTPS, EVERYWHERE
+      // BULLETPROOF COPY — works everywhere
       const textarea = document.createElement("textarea");
       textarea.value = shareUrl;
       textarea.style.position = "fixed";
@@ -139,9 +139,11 @@ const createQuickTicket = async () => {
       textarea.select();
       document.execCommand("copy");
       document.body.removeChild(textarea);
-      alert(`TICKET READY — LINK COPIED!\n\n${shareUrl}\n\nSend it to the driver`);
+
+      alert(
+        `DRIVER LINK READY — SEND NOW!\n\n${shareUrl}\n\nDriver taps → starts navigation immediately`
+      );
     }
-  };
 
   // MAP WITH LIVE CYAN DOTS
   useEffect(() => {
@@ -227,7 +229,7 @@ const createQuickTicket = async () => {
                   {t.needsForklift && <p className="text-red-400 text-2xl font-bold mt-4">FORKLIFT NEEDED</p>}
                     <button
                       onClick={() => {
-                        const url = `${window.location.origin}/ticket/${t.shortId || t.id}`;
+                        const url = `${window.location.origin}/driver?ticketId=${t.shortId || t.id}`;
                         
                         // BULLETPROOF COPY — WORKS ON HTTP, HTTPS, EVERYWHERE
                         const textarea = document.createElement("textarea");

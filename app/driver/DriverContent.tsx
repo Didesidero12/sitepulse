@@ -550,7 +550,7 @@ return (
     isOpen={true}
     onClose={() => {}}
     snapPoints={[0, 0.15, 0.6, 1]}  // Fixed: ascending with 0 and 1
-    initialSnap={1}  // Start at peek (0.15)
+    initialSnap={2}  // → now starts at 0.6 (60%) → perfect height
     onSnap={(index) => setSheetSnap(index)}
     disableDismiss={true}
     disableDrag={false}
@@ -682,37 +682,50 @@ return (
   >
     I'VE ARRIVED
   </button>
-) : (
-  <button
-    onClick={() => {
-      setTracking(false);
-      setCurrentPos(null);
-      setSmoothedPos(null);
-      setPosition(null);
-      setRoute(null);
-      setEtaMinutes(null);
-      setDistanceMiles(null);
-      setArrivalTime('--:-- AM');
-      setInstructions([]);
-      setNextInstruction('Follow the route');
-      setArrived(false);
-      setShowArrivalConfirm(false);
-      setNotified30Min(false);
-      setNotified5Min(false);
-    }}
-    style={{
-      padding: '10px 20px',
-      fontSize: '16px',
-      fontWeight: 'bold',
-      color: 'white',
-      background: '#dc2626',
-      border: 'none',
-      borderRadius: '20px',
-    }}
-  >
-    Stop
-  </button>
-)}
+    ) : (
+      <button
+        onClick={() => {
+          setTracking(false);
+          setCurrentPos(null);
+          setSmoothedPos(null);
+          setPosition(null);
+          setRoute(null);
+          setEtaMinutes(null);
+          setDistanceMiles(null);
+          setArrivalTime('--:-- AM');
+          setInstructions([]);
+          setNextInstruction('Follow the route');
+          setArrived(false);
+          setShowArrivalConfirm(false);
+          setNotified30Min(false);
+          setNotified5Min(false);
+
+          // FINAL UNLOCK — MAP IS FREE AGAIN
+          if (mapRef.current) {
+            const map = mapRef.current.getMap();
+            map.dragPan.enable();
+            map.scrollZoom.enable();
+            map.doubleClickZoom.enable();
+            map.touchZoomRotate.enable();
+            map.keyboard.enable();
+          }
+          setHasFirstFix(false);
+        }}
+        style={{
+          padding: '14px 32px',        // a bit bigger, feels premium
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: 'white',
+          background: '#dc2626',       // bright red
+          border: 'none',
+          borderRadius: '28px',
+          boxShadow: '0 4px 12px rgba(220, 38, 38, 0.4)',
+          minWidth: '140px',
+        }}
+      >
+        Stop
+      </button>
+    )}
     </div>
 
     {/* Dynamic Equipment / Site Assistance Warning — Only when arrived */}
