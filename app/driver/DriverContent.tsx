@@ -10,6 +10,7 @@ import { useRef, useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import dynamic from 'next/dynamic';
+import { memo } from 'react';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -226,7 +227,8 @@ useEffect(() => {
           });
         }
         // END OF FIX
-
+// ADD THIS LOG HERE
+        console.log('GPS position received:', newPos, 'mapRef ready for flyTo?', !!mapRef.current);
       },
       (err) => {
         console.error("GPS Error:", err);
@@ -340,18 +342,18 @@ useEffect(() => {
     const map = mapRef.current.getMap();
     if (!map) return;
 
-    // Use current GPS position if we have it, otherwise fall back to destination
     const target = position || destination;
 
     map.flyTo({
       center: [target.lng, target.lat],
       zoom: 16,
       duration: 1500,
-      essential: true,        // makes sure this animation wins over any others
+      essential: true,
     });
 
-    console.log('Initial snap on Start →', target.lng, target.lat);
-  }, [tracking]); // ← only depends on tracking, NOT on position
+    // ADD THIS LOG HERE
+    console.log('Initial snap fired to:', target, 'mapRef ready?', !!mapRef.current);
+  }, [tracking]);
 
   // ADD THIS — fixes blank screen on rotate/orientation change
 useEffect(() => {
@@ -384,22 +386,19 @@ useEffect(() => {
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      <Map
+        <Map
         ref={mapRef}
-        initialViewState={{ // FIX: Use uncontrolled like older
-          latitude: destination.lat,
-          longitude: destination.lng,
-          zoom: 12,
-        }}
+        initialViewState={{ latitude: destination.lat, longitude: destination.lng, zoom: 12 }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        // dragPan={!position}           // only lock after first GPS arrives
-        // dragRotate={!position}
-        // scrollZoom={!position}
-        // touchZoomRotate={!position}
-        // keyboard={!tracking}
-        // doubleClickZoom={!tracking}
+        // Temporarily enable all interactions to test
+        dragPan={true}
+        dragRotate={true}
+        scrollZoom={true}
+        touchZoomRotate={true}
+        keyboard={true}
+        doubleClickZoom={true}
       >
         {tracking && position && (
           <Marker longitude={position.lng} latitude={position.lat} anchor="center" rotation={position.heading ?? 0} rotationAlignment="map">
