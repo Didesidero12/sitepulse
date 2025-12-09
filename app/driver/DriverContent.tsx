@@ -23,6 +23,7 @@ export default function DriverContent() {
   const [arrived, setArrived] = useState(false);
   const [heading, setHeading] = useState<number | null>(null);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
+  const [bearingMode, setBearingMode] = useState<'north' | 'heading' | '3d'>('north');
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -370,10 +371,18 @@ return (
         latitude: destination.lat,
         longitude: destination.lng,
         zoom: 12,
+        bearing: 0,
+        pitch: 0,
       }}
+      // ← LIVE bearing & pitch — this is what makes heading-up + 3D work
+      bearing={bearingMode === 'north' ? 0 : heading || 0}
+      pitch={bearingMode === '3d' ? 60 : 0}
       style={{ width: '100%', height: '100%' }}
       mapStyle="mapbox://styles/mapbox/streets-v12"
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+      // These two lines make rotation/tilt feel like butter on all devices
+      bearingTransition={{ duration: 800 }}
+      pitchTransition={{ duration: 800 }}
     >
     {/* FINAL CYAN ARROW PUCK — HEADING-AWARE */}
     {tracking && smoothedPos && (
@@ -444,6 +453,39 @@ return (
         )}
         </Map>
 
+{/* ORIENTATION CYCLE BUTTON — North → Heading-Up → 3D */}
+{tracking && (
+  <div
+    style={{
+      position: 'absolute',
+      top: 16,
+      right: 16,
+      background: 'white',
+      borderRadius: '50%',
+      width: 56,
+      height: 56,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      zIndex: 2000,
+      border: '2px solid #eee',
+      cursor: 'pointer',
+    }}
+    onClick={() => {
+      if (bearingMode === 'north') setBearingMode('heading');
+      else if (bearingMode === 'heading') setBearingMode('3d');
+      else setBearingMode('north');
+    }}
+  >
+    {bearingMode === 'north' && <span style={{ fontSize: 32, fontWeight: 'bold' }}>N</span>}
+    {bearingMode === 'heading' && <span style={{ fontSize: 28, transform: 'rotate(45deg)' }}>Direction</span>}
+    {bearingMode === '3d' && <span style={{ fontSize: 22, fontWeight: 'bold' }}>3D</span>}
+  </div>
+)}
+
+
+
     {tracking && position && sheetSnap !== 0 && (
     <div
         style={{
@@ -463,7 +505,7 @@ return (
         }}
         onClick={() => {
         mapRef.current?.flyTo({
-            center: [position.lng, position.lat],
+            center: [currentPos?.lng || destination.lng, currentPos?.lat || destination.lat],
             zoom: 16,
             duration: 1500,
         });
