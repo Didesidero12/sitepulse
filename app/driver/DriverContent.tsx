@@ -333,20 +333,25 @@ useEffect(() => {
     });
   }, [cameraMode, tracking]); // Trigger only on mode change, not position
 
-  // Initial snap on Start
+  // Instant snap on "Start" — even if GPS hasn't arrived yet
   useEffect(() => {
-    if (tracking && mapRef.current && position) {
-      const map = mapRef.current.getMap();
-      if (map) {
-        map.flyTo({
-          center: [position.lng, position.lat],
-          zoom: 16,
-          duration: 1500,
-          essential: true,
-        });
-      }
-    }
-  }, [tracking, position]);
+    if (!tracking || !mapRef.current) return;
+
+    const map = mapRef.current.getMap();
+    if (!map) return;
+
+    // Use current GPS position if we have it, otherwise fall back to destination
+    const target = position || destination;
+
+    map.flyTo({
+      center: [target.lng, target.lat],
+      zoom: 16,
+      duration: 1500,
+      essential: true,        // makes sure this animation wins over any others
+    });
+
+    console.log('Initial snap on Start →', target.lng, target.lat);
+  }, [tracking]); // ← only depends on tracking, NOT on position
 
   // ADD THIS — fixes blank screen on rotate/orientation change
 useEffect(() => {
