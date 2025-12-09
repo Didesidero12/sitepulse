@@ -365,25 +365,23 @@ useLayoutEffect(() => {
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
     {/* Full-screen Map */}
-    <Map
-      ref={mapRef}
-      initialViewState={{
-        latitude: destination.lat,
-        longitude: destination.lng,
-        zoom: 12,
-        bearing: 0,
-        pitch: 0,
-      }}
-      // ← LIVE bearing & pitch — this is what makes heading-up + 3D work
-      bearing={bearingMode === 'north' ? 0 : heading || 0}
-      pitch={bearingMode === '3d' ? 60 : 0}
-      style={{ width: '100%', height: '100%' }}
-      mapStyle="mapbox://styles/mapbox/streets-v12"
-      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-      // These two lines make rotation/tilt feel like butter on all devices
-      bearingTransition={{ duration: 800 }}
-      pitchTransition={{ duration: 800 }}
-    >
+<Map
+  ref={mapRef}
+  initialViewState={{
+    latitude: destination.lat,
+    longitude: destination.lng,
+    zoom: 12,
+    bearing: 0,
+    pitch: 0,
+  }}
+  // LIVE bearing & pitch — Mapbox handles the smooth transition natively
+  bearing={bearingMode === 'north' ? 0 : (heading || 0)}
+  pitch={bearingMode === '3d' ? 60 : 0}
+  
+  style={{ width: '100%', height: '100%' }}
+  mapStyle="mapbox://styles/mapbox/streets-v12"
+  mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+>
     {/* FINAL CYAN ARROW PUCK — HEADING-AWARE */}
     {tracking && smoothedPos && (
       <Marker
