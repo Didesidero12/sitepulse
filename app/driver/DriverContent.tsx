@@ -23,7 +23,8 @@ export default function DriverContent() {
   const [arrived, setArrived] = useState(false);
   const [heading, setHeading] = useState<number | null>(null);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
-  const [bearingMode, setBearingMode] = useState<'north' | 'heading' | '3d'>('north');
+  const [bearingMode, setBearingMode] = useState<'north' | 'heading' | '3d'>('3d');
+  const [hasFirstFix, setHasFirstFix] = useState(false);
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -192,6 +193,10 @@ const watchId = navigator.geolocation.watchPosition(
     // 1. Update all position states (raw + legacy sync)
     setCurrentPos(newRawPos);
     setPosition(newRawPos); // ← keeps old references working (we delete this line forever in 2 minutes)
+    // THIS IS THE FINAL LOCK — triggers everything else
+    if (!hasFirstFix) {
+      setHasFirstFix(true);
+    }
 
     // 2. First GPS fix → initialize smoothed pos instantly
     if (!smoothedPos) {
@@ -259,6 +264,21 @@ const watchId = navigator.geolocation.watchPosition(
     console.log('GPS cleanup complete');
   };
 }, [tracking]); // ← only dependency is tracking
+
+{/* FINAL LOCK — Disable panning/zooming after first GPS fix */}
+useEffect(() => {
+  if (!mapRef.current || !hasFirstFix) return;
+
+  const map = mapRef.current.getMap(); // This gets the real Mapbox instance
+
+  map.dragPan.disable();
+  map.scrollZoom.disable();
+  map.doubleClickZoom.disable();
+  map.touchZoomRotate.disable();
+  map.keyboard.disable(); // Optional: disables arrow keys too
+
+  // Cleanup not needed — we want it locked until Stop
+}, [hasFirstFix]);
 
 // UseEffect (Realtime Ticket Listener)
 useEffect(() => {
@@ -451,7 +471,7 @@ return (
         )}
         </Map>
 
-{/* ORIENTATION CYCLE BUTTON — North → Heading-Up → 3D */}
+{/* ORIENTATION CYCLE BUTTON — Clean icons, no overflow */}
 {tracking && (
   <div
     style={{
@@ -469,53 +489,60 @@ return (
       zIndex: 2000,
       border: '2px solid #eee',
       cursor: 'pointer',
+      fontWeight: 'bold',
+      userSelect: 'none',
     }}
     onClick={() => {
-      if (bearingMode === 'north') setBearingMode('heading');
-      else if (bearingMode === 'heading') setBearingMode('3d');
-      else setBearingMode('north');
+      if (bearingMode === '3d') setBearingMode('north');
+      else if (bearingMode === 'north') setBearingMode('heading');
+      else setBearingMode('3d');
     }}
   >
-    {bearingMode === 'north' && <span style={{ fontSize: 32, fontWeight: 'bold' }}>N</span>}
-    {bearingMode === 'heading' && <span style={{ fontSize: 28, transform: 'rotate(45deg)' }}>Direction</span>}
-    {bearingMode === '3d' && <span style={{ fontSize: 22, fontWeight: 'bold' }}>3D</span>}
+    {bearingMode === 'north' && <span style={{ fontSize: 32 }}>N</span>}
+    {bearingMode === 'heading' && <span style={{ fontSize: 28, transform: 'rotate(45deg)' }}>Arrow</span>}
+    {bearingMode === '3d' && <span style={{ fontSize: 24 }}>3D</span>}
   </div>
 )}
 
 
-
-    {tracking && position && sheetSnap !== 0 && (
-    <div
-        style={{
-        position: 'absolute',
-        bottom: '240px',  // High enough for all phones
-        right: '16px',
-        background: 'white',
-        borderRadius: '50%',
-        width: '56px',
-        height: '56px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-        zIndex: 2000,
-        border: '2px solid #eee',
-        }}
-        onClick={() => {
-        mapRef.current?.flyTo({
-            center: [currentPos?.lng || destination.lng, currentPos?.lat || destination.lat],
-            zoom: 16,
-            duration: 1500,
-        });
-        }}
-    >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 8v8" />
-        <path d="M8 12h8" />
-        </svg>
-    </div>
-    )}
+{/* RE-CENTER BUTTON — works perfectly in 3D + heading-up mode */}
+{tracking && currentPos && sheetSnap !== 0 && (
+  <div
+    style={{
+      position: 'absolute',
+      bottom: '240px',  // High enough for all phones
+      right: '16px',
+      background: 'white',
+      borderRadius: '50%',
+      width: '56px',
+      height: '56px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      zIndex: 2000,
+      border: '2px solid #eee',
+      cursor: 'pointer',
+    }}
+    onClick={() => {
+      mapRef.current?.flyTo({
+        center: [currentPos.lng, currentPos.lat],
+        zoom: 17.5,
+        bearing: bearingMode === 'north' ? 0 : (heading || 0),
+        pitch: bearingMode === '3d' ? 60 : 0,
+        duration: 1200,
+        speed: 3,
+        essential: true,
+      });
+    }}
+  >
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v8" />
+      <path d="M8 12h8" />
+    </svg>
+  </div>
+)}
 
     {/* Bottom Sheet */}
     <Sheet
