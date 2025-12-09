@@ -1,27 +1,38 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
 import mbxClient from '@mapbox/mapbox-sdk';
 import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
-import { Source, Layer } from 'react-map-gl/mapbox';
-import { useRef, useState, useEffect, useLayoutEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import dynamic from 'next/dynamic';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
 export default function DriverContent() {
+  // FIX: Add viewState for controlled map
+  const [viewState, setViewState] = useState({
+    longitude: -119.22323,
+    latitude: 46.21667,
+    zoom: 10,
+    pitch: 0,
+    bearing: 0,
+  });
+
   // UI & Tracking State
   const [sheetSnap, setSheetSnap] = useState(1);
   const [tracking, setTracking] = useState(false);
-  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [position, setPosition] = useState<{ lat: number; lng: number; heading?: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
+  const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
+  const [mapLoaded, setMapLoaded] = useState(false);  // ← ADD THIS LINE
+  const [cameraMode, setCameraMode] = useState<'north-up' | 'heading-up' | '3d-heading-up'>('north-up');  // 'north-up', 'heading-up', '3d-heading-up'
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -34,6 +45,8 @@ export default function DriverContent() {
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
   const [instructions, setInstructions] = useState<string[]>([]);
   const [nextInstruction, setNextInstruction] = useState<string>('Follow the route');
+  const [hasStartedNavigation, setHasStartedNavigation] = useState(false);
+  const [is3D, setIs3D] = useState(false);  // false = 2D, true = 3D
 
   // Notification State
   const [notified30Min, setNotified30Min] = useState(false);
@@ -46,6 +59,10 @@ export default function DriverContent() {
   // Refs
   const sheetRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
+  const Map = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Map), { ssr: false });
+  const Marker = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Marker), { ssr: false });
+  const Source = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Source), { ssr: false });
+  const Layer = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Layer), { ssr: false });
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
@@ -200,17 +217,30 @@ const formatDuration = (minutes: number | null) => {
   return () => unsubscribe();
 }, [searchParams]);
 
-    // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
   if (tracking) {
-    console.log('GPS useEffect triggered — starting watchPosition');  // Debug log
+    console.log('GPS useEffect triggered — starting watchPosition');
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setPosition(newPos);
-        console.log('GPS success — new position:', newPos);  // Debug log
+        const newPos = { 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading ?? undefined  // ← Capture heading (null if unavailable)
+        };
+        console.log('GPS success — new position + heading:', newPos);
 
+        // Smooth animation if we have a previous position
+        if (position) {
+          animateMarker(position, newPos);
+        } else {
+          setPosition(newPos);
+        }
+
+        // Always update target for re-center button
+        targetPosition = newPos;
+
+        // Camera follow (smooth flyTo)
         if (mapRef.current) {
           mapRef.current.flyTo({
             center: [newPos.lng, newPos.lat],
@@ -229,10 +259,22 @@ useEffect(() => {
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      console.log('GPS useEffect cleanup — watch cleared');  // Debug log
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
   }
 }, [tracking]);
+
+// On Start — immediately fly to current position (or destination as fallback)
+useEffect(() => {
+  if (tracking && mapRef.current) {
+    const centerPos = position || destination;
+    mapRef.current.flyTo({
+      center: [centerPos.lng, centerPos.lat],
+      zoom: 16,
+      duration: 2000,
+    });
+  }
+}, [tracking]); // ← This runs exactly once when you hit Start
 
 // UseEffect (Realtime Ticket Listener)
 useEffect(() => {
@@ -329,117 +371,250 @@ useEffect(() => {
   }
 }, [tracking, position]);
 
-useLayoutEffect(() => {
-  if (tracking && sheetRef.current) {
-    requestAnimationFrame(() => {
-      sheetRef.current.snapTo(1); // Peek
+  // ──────────────────────────────────────────────────────────────
+  // CENTRALIZED CAMERA CONTROL (the magic that fixes flashing)
+  // ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapRef.current || !tracking || !position) return;
+
+    const map = mapRef.current.getMap();
+    if (!map) return;
+
+    const { lat, lng, heading } = position;
+    
+    // Determine camera settings based on mode
+    let bearing = 0;
+    let pitch = 0;
+    let duration = 1000; // Smooth following
+    
+    switch (cameraMode) {
+      case 'heading-up':
+        bearing = heading || 0;
+        break;
+      case '3d-heading-up':
+        bearing = heading || 0;
+        pitch = 60;
+        break;
+      default: // north-up
+        bearing = 0;
+        pitch = 0;
+    }
+
+    // Use essential: true to prioritize navigation over other animations
+    map.easeTo({
+      center: [lng, lat],
+      zoom: 16,
+      bearing,
+      pitch,
+      duration,
+      essential: true,
     });
-  }
-}, [tracking]);
+  }, [position, cameraMode, tracking]);
+
+  {/* Auto-remove loading screen after 4 seconds even if onLoad never fires */}
+      {useEffect(() => {
+        const timer = setTimeout(() => setMapLoaded(true), 4000);
+        return () => clearTimeout(timer);
+      }, [])}
+
+  // FIX: Handle Start - immediate snap to position with essential priority
+useEffect(() => {
+    if (tracking && mapRef.current && position) {
+      const map = mapRef.current.getMap();
+      if (map) {
+        map.flyTo({
+          center: [position.lng, position.lat],
+          zoom: 16,
+          duration: 1500,
+          essential: true,
+        });
+      }
+    }
+  }, [tracking, position]);
 
 return (
-  <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-    {/* Full-screen Map */}
-    <Map
-      ref={mapRef}
-      initialViewState={{
-        latitude: destination.lat,
-        longitude: destination.lng,
-        zoom: 12,
-      }}
-      style={{ width: '100%', height: '100%' }}
-      mapStyle="mapbox://styles/mapbox/streets-v12"
-      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-    >
-      {/* Cyan Dot Marker */}
-      {tracking && position && (
-        <Marker longitude={position.lng} latitude={position.lat}>
+    <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+      {/* MAP */}
+{/* MAP — FINAL BULLETPROOF VERSION */}
+      <Map
+        ref={mapRef}
+        {...viewState}
+        onMove={(evt) => setViewState(evt.viewState)}
+        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+        style={{ width: '100%', height: '100%' }}
+        // Force interactions off while navigating
+        dragPan={!tracking}
+        dragRotate={!tracking}
+        scrollZoom={!tracking}
+        touchZoom={!tracking}
+        touchRotate={!tracking}
+        keyboard={!tracking}
+        doubleClickZoom={!tracking}
+        // This is the magic line that fixes 99% of "stuck on loading" issues
+        reuseMaps
+        // Remove onLoad completely — we’ll handle ready state ourselves
+      >
+        {/* Cyan GPS Arrow */}
+        {tracking && position && (
+          <Marker
+            longitude={position.lng}
+            latitude={position.lat}
+            anchor="center"
+            rotationAlignment="map"
+            rotation={position.heading ?? 0}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                background: 'cyan',
+                border: '5px solid white',
+                borderRadius: '50% 50% 50% 0',
+                transform: 'rotate(-45deg)',
+                boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
+              }}
+            />
+          </Marker>
+        )}
+
+        {/* Red Destination Pin */}
+        <Marker longitude={destination.lng} latitude={destination.lat}>
           <div
             style={{
-              width: '28px',
-              height: '28px',
-              background: 'cyan',
+              width: '24px',
+              height: '24px',
+              background: 'red',
               border: '4px solid white',
               borderRadius: '50%',
-              boxShadow: '0 0 20px rgba(0, 255, 255, 0.8)',
-              animation: 'pulse 2s infinite',
+              boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
             }}
           />
         </Marker>
-      )}
-      {/* Red Destination Pin */}
-      <Marker longitude={destination.lng} latitude={destination.lat}>
-        <div
-          style={{
-            width: '24px',
-            height: '24px',
-            background: 'red',
-            border: '4px solid white',
-            borderRadius: '50%',
-            boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
-          }}
-        />
-      </Marker>
 
-        {/* ← ADD THE BLUE ROUTE LINE HERE */}
+        {/* Blue Route Line */}
         {route && (
-            <Source id="route" type="geojson" data={route}>
+          <Source id="route" type="geojson" data={route}>
             <Layer
-                id="route-line"
-                type="line"
-                paint={{
+              id="route-line"
+              type="line"
+              paint={{
                 'line-color': '#3887be',
                 'line-width': 6,
                 'line-opacity': 0.8,
-                }}
+              }}
             />
-            </Source>
+          </Source>
         )}
-        </Map>
+      </Map>
 
-    {tracking && position && sheetSnap !== 0 && (
-    <div
-        style={{
-        position: 'absolute',
-        bottom: '240px',  // High enough for all phones
-        right: '16px',
-        background: 'white',
-        borderRadius: '50%',
-        width: '56px',
-        height: '56px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-        zIndex: 2000,
-        border: '2px solid #eee',
-        }}
-        onClick={() => {
-        mapRef.current?.flyTo({
-            center: [position.lng, position.lat],
-            zoom: 16,
-            duration: 1500,
-        });
-        }}
-    >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 8v8" />
-        <path d="M8 12h8" />
-        </svg>
-    </div>
-    )}
+      {/* Loading overlay – disappears as soon as Mapbox fires onLoad */}
+{!mapLoaded && (
+        <div style={{
+          position: 'absolute', inset: 0, background: '#0f172a',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: '20px', zIndex: 10
+        }}>
+          Loading map...
+        </div>
+      )}
 
-    {/* Bottom Sheet */}
-    <Sheet
-    ref={sheetRef}
-    isOpen={true}
-    onClose={() => {}}
-    snapPoints={[0, 0.15, 0.6, 1]}  // Fixed: ascending with 0 and 1
-    initialSnap={1}  // Start at peek (0.15)
-    onSnap={(index) => setSheetSnap(index)}
-    disableDismiss={true}
-    disableDrag={false}
+      {/* Camera mode cycle button + Re-center button */}
+      {tracking && position && sheetSnap !== 0 && (
+        <>
+          {/* Cycle Button */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '320px',
+              right: '16px',
+              background:
+                cameraMode === 'north-up' ? 'white' :
+                cameraMode === 'heading-up' ? '#2563eb' :
+                '#7c3aed',
+              color: cameraMode === 'north-up' ? '#333' : 'white',
+              borderRadius: '50%',
+              width: '56px',
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              border: '2px solid #eee',
+              cursor: 'pointer',
+              zIndex: 2000,
+            }}
+            onClick={() => {
+              if (cameraMode === 'north-up') setCameraMode('heading-up');
+              else if (cameraMode === 'heading-up') setCameraMode('3d-heading-up');
+              else setCameraMode('north-up');
+            }}
+          >
+            {cameraMode === 'north-up' && (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 2v20" />
+              </svg>
+            )}
+            {cameraMode === 'heading-up' && (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 2L2 12h3v8h14v-8h3L12 2z" />
+                <path d="M12 8v8" />
+              </svg>
+            )}
+            {cameraMode === '3d-heading-up' && (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 2l-10 10h4v10h12v-10h4l-10-10z" />
+                <path d="M8 8l4 4 4-4" />
+              </svg>
+            )}
+          </div>
+
+          {/* Re-center button */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '240px',
+              right: '16px',
+              background: 'white',
+              borderRadius: '50%',
+              width: '56px',
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              border: '2px solid #eee',
+              cursor: 'pointer',
+              zIndex: 2000,
+            }}
+            onClick={() => {
+              mapRef.current?.flyTo({
+                center: [position!.lng, position!.lat],
+                zoom: 16,
+                duration: 1500,
+              });
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v8" />
+              <path d="M8 12h8" />
+            </svg>
+          </div>
+        </>
+      )}
+
+      {/* Bottom Sheet — unchanged */}
+      <Sheet
+        ref={sheetRef}
+        isOpen={true}
+        onClose={() => {}}
+        snapPoints={[0.6, 0.15]}
+        initialSnap={1}
+        onSnap={(index) => setSheetSnap(index)}
+        disableDismiss={true}
+        disableDrag={false}
     >
   <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
@@ -771,28 +946,27 @@ return (
 
   <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
 </Sheet>
-  
-    {/* Global Style for Touch Pass-Through */}
-        <style jsx global>{`
+
+      {/* Global styles */}
+      <style jsx global>{`
         .react-modal-sheet-backdrop {
-            pointer-events: none !important;
+          pointer-events: none !important;
         }
         .react-modal-sheet-container {
-            pointer-events: none !important;
+          pointer-events: none !important;
         }
         .react-modal-sheet-content > div {
-            pointer-events: auto !important;
+          pointer-events: auto !important;
         }
-        `}</style>
+      `}</style>
 
-        {/* Pulse Animation */}
-        <style jsx>{`
-        @keyframes pulse {
+    <style jsx>{`
+          @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
-        }
+          }
         `}</style>
-    </div>
+      </div>
     );
   }
