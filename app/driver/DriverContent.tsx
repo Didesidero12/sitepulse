@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getDoc, getDocs, query, where, collection } from 'firebase/firestore';
 import { Ticket } from '@/lib/types';
+import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -34,7 +35,7 @@ export default function DriverContent() {
   });
 
   // Route & Guidance State
-  const [route, setRoute] = useState<mapboxgl.DirectionsResponse | null>(null);
+  const [route, setRoute] = useState<MapboxRoute | null>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
