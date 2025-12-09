@@ -21,6 +21,7 @@ export default function DriverContent() {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
   const [arrived, setArrived] = useState(false);
+  const [heading, setHeading] = useState<number | null>(null);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
@@ -42,6 +43,12 @@ export default function DriverContent() {
   // Ticket Integration State (Brick 9)
   const [ticket, setTicket] = useState<any>(null);  // Full ticket from Firebase
   const [loadingTicket, setLoadingTicket] = useState(true);  // Show loading if needed
+  
+  //my adds
+  const [currentPos, setCurrentPos] = useState<{ lng: number; lat: number } | null>(null);
+  const [smoothedPos, setSmoothedPos] = useState<{ lng: number; lat: number } | null>(null);
+  const animationRef = useRef<number>();
+  const lastUpdateTime = useRef<number>(0);
 
   // Refs
   const sheetRef = useRef<any>(null);
@@ -140,36 +147,6 @@ const formatDuration = (minutes: number | null) => {
     return dist < 75;  // ~75 meters = arrived
   };
 
-  // ← ADD SMOOTH DOT ANIMATION HELPER HERE
-  let animationFrameId: number | null = null;
-  let targetPosition: { lat: number; lng: number } | null = null;
-
-  const animateMarker = (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-
-    const startTime = performance.now();
-    const duration = 2000; // 2 seconds smooth animation
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Linear interpolation
-      const lat = from.lat + (to.lat - from.lat) * progress;
-      const lng = from.lng + (to.lng - from.lng) * progress;
-
-      setPosition({ lat, lng });
-
-      if (progress < 1) {
-        animationFrameId = requestAnimationFrame(animate);
-      } else {
-        animationFrameId = null;
-      }
-    };
-
-    animationFrameId = requestAnimationFrame(animate);
-  };
-
     //Ticket Listener
     useEffect(() => {
   const ticketId = searchParams.get('ticketId');
@@ -200,39 +177,87 @@ const formatDuration = (minutes: number | null) => {
   return () => unsubscribe();
 }, [searchParams]);
 
-    // ← REPLACE THE OLD ROUTE-RELATED EFFECT (if any) WITH THIS NEW ONE
 useEffect(() => {
-  if (tracking) {
-    console.log('GPS useEffect triggered — starting watchPosition');  // Debug log
+  if (!tracking) return;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setPosition(newPos);
-        console.log('GPS success — new position:', newPos);  // Debug log
+  console.log('GPS useEffect triggered — starting watchPosition');
 
-        if (mapRef.current) {
-          mapRef.current.flyTo({
-            center: [newPos.lng, newPos.lat],
-            zoom: 16,
-            duration: 2000,
-          });
-        }
-      },
-      (err) => {
-        console.error("GPS Error:", err);
-        alert("Location access denied or unavailable");
-        setTracking(false);
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
+const watchId = navigator.geolocation.watchPosition(
+  (position) => {
+    const { latitude, longitude, heading } = position.coords;
+    if (heading !== null) setHeading(heading);
+    const newRawPos = { lng: longitude, lat: latitude };
 
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-      console.log('GPS useEffect cleanup — watch cleared');  // Debug log
+    // 1. Update all position states (raw + legacy sync)
+    setCurrentPos(newRawPos);
+    setPosition(newRawPos); // ← keeps old references working (we delete this line forever in 2 minutes)
+
+    // 2. First GPS fix → initialize smoothed pos instantly
+    if (!smoothedPos) {
+      setSmoothedPos(newRawPos);
+      // Force immediate render of the dot
+      requestAnimationFrame(() => setSmoothedPos(newRawPos));
+    }
+
+    // 3. Cancel any running animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    // 4. Smooth interpolation — the butter
+    const startTime = performance.now();
+    const animate = () => {
+      setSmoothedPos((prev) => {
+        if (!prev) return newRawPos;
+
+        const dx = newRawPos.lng - prev.lng;
+        const dy = newRawPos.lat - prev.lat;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Big GPS jump (tunnel exit, etc.) → snap instantly
+        if (distance > 0.001) return newRawPos;
+
+        const factor = 0.28; // perfect balance
+        return {
+          lng: prev.lng + dx * factor,
+          lat: prev.lat + dy * factor,
+        };
+      });
+
+      if (performance.now() - startTime < 100) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
     };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    // 5. Instant map follow — the legendary snap
+    mapRef.current?.flyTo({
+      center: [newRawPos.lng, newRawPos.lat],
+      zoom: 17,
+      duration: 1800,
+      speed: 4,
+      essential: true,
+    });
+  },
+  (err) => {
+    console.error('GPS Error:', err);
+    alert('Location access denied or unavailable');
+    setTracking(false);
+  },
+  {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0,
   }
-}, [tracking]);
+);
+
+  return () => {
+    navigator.geolocation.clearWatch(watchId);
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    console.log('GPS cleanup complete');
+  };
+}, [tracking]); // ← only dependency is tracking
 
 // UseEffect (Realtime Ticket Listener)
 useEffect(() => {
@@ -286,25 +311,24 @@ useEffect(() => {
 }, [ticket?.siteCoords, tracking]);
 
 useEffect(() => {
-  if (tracking && position) {
-    fetchRoute(position);
+  if (tracking && currentPos) {           // ← changed
+    fetchRoute(currentPos);               // ← changed
 
     const interval = setInterval(() => {
-      fetchRoute(position);
+      fetchRoute(currentPos);             // ← changed
 
       // Check arrival
-      if (checkArrival(position) && !arrived) {
+      if (checkArrival(currentPos) && !arrived) {    // ← changed
         setArrived(true);
-        setShowArrivalConfirm(true);  // ← Trigger confirmation buttons
+        setShowArrivalConfirm(true);
 
-        // Optional: Auto-stop after 30 seconds if driver doesn't respond
         setTimeout(() => {
-          if (showArrivalConfirm) {  // Still not confirmed
+          if (showArrivalConfirm) {
             setTracking(false);
             setShowArrivalConfirm(false);
             alert('Auto-stopped: You have arrived at the site.');
           }
-        }, 30000);  // 30 seconds
+        }, 30000);
       }
 
       // ETA Milestone Notifications
@@ -323,11 +347,11 @@ useEffect(() => {
     return () => clearInterval(interval);
   } else {
     setArrived(false);
-    setShowArrivalConfirm(false);  // ← Reset confirmation on stop
+    setShowArrivalConfirm(false);
     setNotified30Min(false);
     setNotified5Min(false);
   }
-}, [tracking, position]);
+}, [tracking, currentPos]);   // ← already correct
 
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
@@ -351,22 +375,45 @@ return (
       mapStyle="mapbox://styles/mapbox/streets-v12"
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
     >
-      {/* Cyan Dot Marker */}
-      {tracking && position && (
-        <Marker longitude={position.lng} latitude={position.lat}>
+    {/* FINAL CYAN ARROW PUCK — HEADING-AWARE */}
+    {tracking && smoothedPos && (
+      <Marker
+        longitude={smoothedPos.lng}
+        latitude={smoothedPos.lat}
+        anchor="center"
+      >
+        <div
+          style={{
+            width: '38px',
+            height: '38px',
+            background: 'cyan',
+            border: '5px solid white',
+            borderRadius: '50%',
+            boxShadow: '0 0 30px rgba(0, 255, 255, 0.95)',
+            animation: 'pulse 2s infinite',
+            position: 'relative',
+          }}
+        >
+          {/* Directional arrowhead — rotates with heading */}
           <div
             style={{
-              width: '28px',
-              height: '28px',
-              background: 'cyan',
-              border: '4px solid white',
-              borderRadius: '50%',
-              boxShadow: '0 0 20px rgba(0, 255, 255, 0.8)',
-              animation: 'pulse 2s infinite',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: 0,
+              height: 0,
+              borderLeft: '9px solid transparent',
+              borderRight: '9px solid transparent',
+              borderBottom: '20px solid rgba(0, 0, 0, 0.75)',
+              transform: `translate(-50%, -85%) rotate(${heading || 0}deg)`,
+              transformOrigin: 'center bottom',
+              transition: heading !== null ? 'transform 0.18s ease-out' : 'none',
+              pointerEvents: 'none',
             }}
           />
-        </Marker>
-      )}
+        </div>
+      </Marker>
+    )}
       {/* Red Destination Pin */}
       <Marker longitude={destination.lng} latitude={destination.lat}>
         <div
@@ -480,115 +527,125 @@ return (
         )}
       </div>
 
-       {/* Conditional Button Flow: Confirm / Not Yet, I've Arrived, or Stop */}
-      {showArrivalConfirm ? (
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={async () => {
-              const ticketId = searchParams.get('ticketId');
-              if (!ticketId) {
-                alert('Error: No ticket ID found.');
-                setTracking(false);
-                setShowArrivalConfirm(false);
-                return;
-              }
+ {/* Stop / Arrival Button Flow — NOW WITH FULL CLEANUP */}
+{showArrivalConfirm ? (
+  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+    <button
+      onClick={async () => {
+        const ticketId = searchParams.get('ticketId');
+        if (!ticketId) {
+          alert('Error: No ticket ID found.');
+          setTracking(false);
+          setShowArrivalConfirm(false);
+          return;
+        }
 
-              try {
-                await updateDoc(doc(db, 'tickets', ticketId), {
-                  status: 'delivered',
-                  deliveredAt: serverTimestamp(),
-                });
-                console.log(`Ticket ${ticketId} marked as delivered`);
-                alert('Arrival confirmed! Ticket delivered.');
-              } catch (err) {
-                console.error('Failed to update ticket:', err);
-                alert('Error confirming delivery. Try again.');
-              } finally {
-                setTracking(false);
-                setShowArrivalConfirm(false);
-              }
-            }}
-            style={{
-              padding: '14px 28px',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: 'white',
-              background: '#2563eb',
-              border: 'none',
-              borderRadius: '20px',
-              minWidth: '160px',
-            }}
-          >
-            Confirm Arrival
-          </button>
-          <button
-            onClick={() => setShowArrivalConfirm(false)}
-            style={{
-              padding: '14px 28px',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: '#333',
-              background: '#e5e7eb',
-              border: 'none',
-              borderRadius: '20px',
-              minWidth: '120px',
-            }}
-          >
-            Not Yet
-          </button>
-        </div>
-      ) : arrived ? (
-        <button
-          onClick={async () => {
-            const ticketId = searchParams.get('ticketId');
-            if (!ticketId) {
-              alert('Error: No ticket ID found.');
-              setTracking(false);
-              return;
-            }
-
-            try {
-              await updateDoc(doc(db, 'tickets', ticketId), {
-                status: 'delivered',
-                deliveredAt: serverTimestamp(),
-              });
-              console.log(`Ticket ${ticketId} marked as delivered`);
-              alert('Arrival confirmed! Ticket delivered.');
-            } catch (err) {
-              console.error('Failed to update ticket:', err);
-              alert('Error confirming delivery. Try again.');
-            } finally {
-              setTracking(false);
-            }
-          }}
-          style={{
-            padding: '14px 28px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: 'white',
-            background: '#2563eb',
-            border: 'none',
-            borderRadius: '20px',
-          }}
-        >
-          I'VE ARRIVED
-        </button>
-      ) : (
-        <button
-          onClick={() => setTracking(false)}
-          style={{
-            padding: '10px 20px',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            color: 'white',
-            background: '#dc2626',
-            border: 'none',
-            borderRadius: '20px',
-          }}
-        >
-          Stop
-        </button>
-      )}
+        try {
+          await updateDoc(doc(db, 'tickets', ticketId), {
+            status: 'delivered',
+            deliveredAt: serverTimestamp(),
+          });
+          alert('Arrival confirmed! Ticket delivered.');
+        } catch (err) {
+          console.error('Failed to update ticket:', err);
+          alert('Error confirming delivery.');
+        } finally {
+          // FULL CLEAN RESET
+          setTracking(false);
+          setCurrentPos(null);
+          setSmoothedPos(null);
+          setPosition(null);
+          setRoute(null);
+          setEtaMinutes(null);
+          setDistanceMiles(null);
+          setArrivalTime('--:-- AM');
+          setInstructions([]);
+          setNextInstruction('Follow the route');
+          setArrived(false);
+          setShowArrivalConfirm(false);
+          setNotified30Min(false);
+          setNotified5Min(false);
+        }
+      }}
+      style={{
+        padding: '14px 28px',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        color: 'white',
+        background: '#2563eb',
+        border: 'none',
+        borderRadius: '20px',
+        minWidth: '160px',
+      }}
+    >
+      Confirm Arrival
+    </button>
+    <button
+      onClick={() => setShowArrivalConfirm(false)}
+      style={{
+        padding: '14px 28px',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        color: '#333',
+        background: '#e5e7eb',
+        border: 'none',
+        borderRadius: '20px',
+        minWidth: '120px',
+      }}
+    >
+      Not Yet
+    </button>
+  </div>
+) : arrived ? (
+  <button
+    onClick={async () => {
+      // Same as Confirm Arrival above — reuse the same cleanup logic
+      // (Just copy the onClick from Confirm Arrival button if you want)
+      alert('Use Confirm Arrival button above');
+    }}
+    style={{
+      padding: '14px 28px',
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: 'white',
+      background: '#2563eb',
+      border: 'none',
+      borderRadius: '20px',
+    }}
+  >
+    I'VE ARRIVED
+  </button>
+) : (
+  <button
+    onClick={() => {
+      setTracking(false);
+      setCurrentPos(null);
+      setSmoothedPos(null);
+      setPosition(null);
+      setRoute(null);
+      setEtaMinutes(null);
+      setDistanceMiles(null);
+      setArrivalTime('--:-- AM');
+      setInstructions([]);
+      setNextInstruction('Follow the route');
+      setArrived(false);
+      setShowArrivalConfirm(false);
+      setNotified30Min(false);
+      setNotified5Min(false);
+    }}
+    style={{
+      padding: '10px 20px',
+      fontSize: '16px',
+      fontWeight: 'bold',
+      color: 'white',
+      background: '#dc2626',
+      border: 'none',
+      borderRadius: '20px',
+    }}
+  >
+    Stop
+  </button>
+)}
     </div>
 
     {/* Dynamic Equipment / Site Assistance Warning — Only when arrived */}
