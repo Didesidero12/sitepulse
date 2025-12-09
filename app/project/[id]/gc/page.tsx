@@ -91,59 +91,58 @@ useEffect(() => {
     return unsub;
   }, [id]);
 
-// QUICK TICKET — FINAL, WORKS EVERYWHERE
-const createQuickTicket = async () => {
-  const shortId = generateShortId(7);
-  await addDoc(collection(db, "tickets"), {
-    projectId: id,
-    material: "Doors from Italy",
-    qty: "12 bifolds",
-    status: "pending",
-    driverId: null,
-    shortId,
-    createdAt: serverTimestamp(),
-    // New / Updated Fields
-    projectName: "Kennewick Project X",  // Pull from project doc later
-    projectAddress: "602 N Colorado St Suite 110, Kennewick, WA 99336",
-    siteCoords: {
-      lat: 46.21667,
-      lng: -119.22323,
-    },
-    csiDivision: "08 - Doors and Windows",
-    loadingEquipment: "Forklift",  // ← Replaces needsForklift — flexible string
-    projectContacts: [
-      { name: "John GC", phone: "509-123-4567", role: "Superintendent" },
-      { name: "Jane PM", phone: "509-987-6543", role: "Project Manager" },
-    ],
-  });
+    // QUICK TICKET — FINAL, WORKS EVERYWHERE
+    const createQuickTicket = async () => {
+      const shortId = generateShortId(7);
+      await addDoc(collection(db, "tickets"), {
+        projectId: id,
+        material: "Doors from Italy",
+        qty: "12 bifolds",
+        status: "pending",
+        driverId: null,
+        shortId,
+        createdAt: serverTimestamp(),
+        projectName: "Kennewick Project X",
+        projectAddress: "602 N Colorado St Suite 110, Kennewick, WA 99336",
+        siteCoords: {
+          lat: 46.21667,
+          lng: -119.22323,
+        },
+        csiDivision: "08 - Doors and Windows",
+        loadingEquipment: "Forklift",
+        projectContacts: [
+          { name: "John GC", phone: "509-123-4567", role: "Superintendent" },
+          { name: "Jane PM", phone: "509-987-6543", role: "Project Manager" },
+        ],
+      });
 
-  const shareUrl = `${window.location.origin}/driver?ticketId=${shortId}`;
+      const shareUrl = `${window.location.origin}/driver?ticketId=${shortId}`;
 
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "SitePulse — Delivery Ready",
-          text: "Doors from Italy • 12 bifolds • Forklift needed\nTap to start navigation →",
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.log("Share cancelled");
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "SitePulse — Delivery Ready",
+            text: "Doors from Italy • 12 bifolds • Forklift needed\nTap to start navigation →",
+            url: shareUrl,
+          });
+        } catch (err) {
+          console.log("Share cancelled");
+        }
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = shareUrl;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        alert(
+          `DRIVER LINK READY — SEND NOW!\n\n${shareUrl}\n\nDriver taps → starts navigation immediately`
+        );
       }
-    } else {
-      // BULLETPROOF COPY — works everywhere
-      const textarea = document.createElement("textarea");
-      textarea.value = shareUrl;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-
-      alert(
-        `DRIVER LINK READY — SEND NOW!\n\n${shareUrl}\n\nDriver taps → starts navigation immediately`
-      );
-    }
+    }; // ←←← THIS IS THE MISSING BRACE THAT KILLED THE BUILD
 
   // MAP WITH LIVE CYAN DOTS
   useEffect(() => {
