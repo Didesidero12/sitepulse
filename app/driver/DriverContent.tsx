@@ -4,16 +4,15 @@ import { useSearchParams } from 'next/navigation';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
-import mbxClient from '@mapbox/mapbox-sdk';
 import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
 import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { getDoc, getDocs, query, where, collection } from 'firebase/firestore';
-import { Ticket } from '@/lib/types';
+import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, getDocs, query, where, collection } from 'firebase/firestore';
+
 import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
+import { Ticket, MapboxRoute } from '@/lib/types';  // ← THIS LINE
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -35,6 +34,7 @@ export default function DriverContent() {
   });
 
   // Route & Guidance State
+  //what I added
   const [route, setRoute] = useState<MapboxRoute | null>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);

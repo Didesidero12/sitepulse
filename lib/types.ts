@@ -1,4 +1,6 @@
 // lib/types.ts
+// lib/types.ts — ADD THIS
+export type MapboxRoute = DirectionsResponse['routes'][number];
 export interface Ticket {
   id: string;
   shortId?: string;
