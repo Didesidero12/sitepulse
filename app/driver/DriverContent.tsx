@@ -31,7 +31,7 @@ export default function DriverContent() {
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
-  const [mapLoaded, setMapLoaded] = useState(false);  // ← ADD THIS LINE
+
   const [cameraMode, setCameraMode] = useState<'north-up' | 'heading-up' | '3d-heading-up'>('north-up');  // 'north-up', 'heading-up', '3d-heading-up'
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
@@ -435,7 +435,7 @@ useEffect(() => {
 return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       {/* MAP */}
-{/* MAP — FINAL BULLETPROOF VERSION */}
+{/* FINAL PRODUCTION-READY MAP */}
       <Map
         ref={mapRef}
         {...viewState}
@@ -443,17 +443,15 @@ return (
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        // Force interactions off while navigating
+        reuseMaps
+
+        // Correct interaction props for react-map-gl v8+
         dragPan={!tracking}
         dragRotate={!tracking}
         scrollZoom={!tracking}
-        touchZoom={!tracking}
-        touchRotate={!tracking}
+        touchZoomRotate={!tracking}   // ← this replaces both touchZoom + touchRotate
         keyboard={!tracking}
         doubleClickZoom={!tracking}
-        // This is the magic line that fixes 99% of "stuck on loading" issues
-        reuseMaps
-        // Remove onLoad completely — we’ll handle ready state ourselves
       >
         {/* Cyan GPS Arrow */}
         {tracking && position && (
@@ -508,16 +506,6 @@ return (
         )}
       </Map>
 
-      {/* Loading overlay – disappears as soon as Mapbox fires onLoad */}
-{!mapLoaded && (
-        <div style={{
-          position: 'absolute', inset: 0, background: '#0f172a',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontSize: '20px', zIndex: 10
-        }}>
-          Loading map...
-        </div>
-      )}
 
       {/* Camera mode cycle button + Re-center button */}
       {tracking && position && sheetSnap !== 0 && (
