@@ -12,6 +12,7 @@ import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getDoc, getDocs, query, where, collection } from 'firebase/firestore';
+import { Ticket } from '@/lib/types';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -26,13 +27,14 @@ export default function DriverContent() {
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const [bearingMode, setBearingMode] = useState<'north' | 'heading' | '3d'>('3d');
   const [hasFirstFix, setHasFirstFix] = useState(false);
+  const [mapIsOffCenter, setMapIsOffCenter] = useState(false);
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
   });
 
   // Route & Guidance State
-  const [route, setRoute] = useState<any>(null);
+  const [route, setRoute] = useState<mapboxgl.DirectionsResponse | null>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
   const [arrivalTime, setArrivalTime] = useState<string>('--:-- AM');
@@ -44,7 +46,7 @@ export default function DriverContent() {
   const [notified5Min, setNotified5Min] = useState(false);
 
   // Ticket Integration State (Brick 9)
-  const [ticket, setTicket] = useState<any>(null);  // Full ticket from Firebase
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loadingTicket, setLoadingTicket] = useState(true);  // Show loading if needed
   
   //my adds
@@ -54,8 +56,8 @@ export default function DriverContent() {
   const lastUpdateTime = useRef<number>(0);
 
   // Refs
-  const sheetRef = useRef<any>(null);
-  const mapRef = useRef<any>(null);
+  const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
+  const mapRef = useRef<MapRef>(null); // proper Mapbox ref
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
@@ -93,7 +95,7 @@ const ticketId = searchParams.get('ticketId');
 
       // Turn-by-turn instructions
       if (routeData.legs && routeData.legs[0] && routeData.legs[0].steps) {
-        const steps = routeData.legs[0].steps.map((step: any) => step.maneuver.instruction);
+        const steps = routeData.legs[0].steps.map((step) => step.maneuver.instruction);
         setInstructions(steps);
         setNextInstruction(steps[0] || 'Follow the route');
       } else {
@@ -236,20 +238,82 @@ const watchId = navigator.geolocation.watchPosition(
   };
 }, [tracking]); // ← only dependency is tracking
 
-{/* FINAL LOCK — Disable panning/zooming after first GPS fix */}
+{/* SOFT FOLLOW MODE — Google-style: free to look around + glow when off-center */}
 useEffect(() => {
-  if (!mapRef.current || !hasFirstFix) return;
+  if (!tracking || !mapRef.current || !currentPos) return;
 
-  const map = mapRef.current.getMap(); // This gets the real Mapbox instance
+  const map = mapRef.current.getMap();
 
-  map.dragPan.disable();
-  map.scrollZoom.disable();
-  map.doubleClickZoom.disable();
-  map.touchZoomRotate.disable();
-  map.keyboard.disable(); // Optional: disables arrow keys too
+  // Re-enable all interaction — driver can explore
+  map.dragPan.enable();
+  map.scrollZoom.enable();
+  map.doubleClickZoom.enable();
+  map.touchZoomRotate.enable();
 
-  // Cleanup not needed — we want it locked until Stop
-}, [hasFirstFix]);
+  // Track if map is off-center (for button glow)
+  const checkOffCenter = () => {
+    if (!currentPos) return;
+    const center = map.getCenter();
+    const distance = turf.distance(
+      [center.lng, center.lat],
+      [currentPos.lng, currentPos.lat],
+      { units: 'meters' }
+    );
+    setMapIsOffCenter(distance > 100); // glow if more than ~100m off
+  };
+
+  // Gentle recenter every 8 seconds
+  const recenterInterval = setInterval(() => {
+    if (tracking && currentPos) {
+      map.easeTo({
+        center: [currentPos.lng, currentPos.lat],
+        zoom: 17.5,
+        bearing: bearingMode === 'north' ? 0 : (heading || 0),
+        pitch: bearingMode === '3d' ? 60 : 0,
+        duration: 1500,
+        essential: true,
+      });
+      setMapIsOffCenter(false); // reset glow after recenter
+    }
+  }, 8000);
+
+  // Instant recenter on big movement (>50m)
+  let lastPos = currentPos;
+  const checkMovement = () => {
+    if (!tracking || !currentPos || !lastPos) return;
+
+    const distance = turf.distance(
+      [lastPos.lng, lastPos.lat],
+      [currentPos.lng, currentPos.lat],
+      { units: 'meters' }
+    );
+
+    if (distance > 50) {
+      map.easeTo({
+        center: [currentPos.lng, currentPos.lat],
+        zoom: 17.5,
+        bearing: bearingMode === 'north' ? 0 : (heading || 0),
+        pitch: bearingMode === '3d' ? 60 : 0,
+        duration: 1200,
+      });
+      setMapIsOffCenter(false);
+    }
+
+    lastPos = currentPos;
+    checkOffCenter(); // update glow state every 3 sec
+  };
+
+  const movementInterval = setInterval(checkMovement, 3000);
+
+  // Also check on manual pan/zoom
+  map.on('moveend', checkOffCenter);
+
+  return () => {
+    clearInterval(recenterInterval);
+    clearInterval(movementInterval);
+    map.off('moveend', checkOffCenter);
+  };
+}, [tracking, currentPos, heading, bearingMode]);
 
 // TICKET LOADING — RESOLVES shortId OR real ticketId, THEN REALTIME LISTEN
 useEffect(() => {
@@ -286,7 +350,7 @@ useEffect(() => {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setTicket({ id: docSnap.id, ...data });
+          setTicket({ id: docSnap.id, ...(data as Ticket) });
           console.log('Real ticket loaded:', data);
         } else {
           console.warn('Ticket disappeared:', resolvedId);
@@ -506,24 +570,27 @@ return (
 )}
 
 
-{/* RE-CENTER BUTTON — works perfectly in 3D + heading-up mode */}
-{tracking && currentPos && sheetSnap !== 0 && (
+
+{/* RECENTER BUTTON — Google-style: flashes when off-center */}
+{tracking && currentPos && (
   <div
     style={{
       position: 'absolute',
-      bottom: '240px',  // High enough for all phones
-      right: '16px',
+      bottom: 230,  // ← moved lower, clear of sheet
+      right: 60,
       background: 'white',
       borderRadius: '50%',
-      width: '56px',
-      height: '56px',
+      width: 56,
+      height: 56,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
       zIndex: 2000,
-      border: '2px solid #eee',
+      border: '3px solid #eee',
       cursor: 'pointer',
+      animation: mapIsOffCenter ? 'pulse-glow 2s infinite' : 'none', // ← flashes when off-center
+      transition: 'all 0.3s ease',
     }}
     onClick={() => {
       mapRef.current?.flyTo({
@@ -535,6 +602,7 @@ return (
         speed: 3,
         essential: true,
       });
+      setMapIsOffCenter(false); // reset flash
     }}
   >
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
@@ -806,7 +874,7 @@ return (
   </>
 )}
 
-{/* Ticket Summary + Claim Button — Dynamic from Real Ticket */}
+{/* TICKET SUMMARY — ALWAYS VISIBLE, NEW PERFECT ORDER */}
 <div style={{
   background: '#f3f4f6',
   borderRadius: '12px',
@@ -818,28 +886,75 @@ return (
   gap: '8px',
 }}>
   <div>
-    <p style={{ margin: '0 0 4px' }}>
-      <strong>Materials:</strong> {ticket?.material || 'Loading...'} ({ticket?.qty || ''})
+    {/* 1. CSI Division */}
+    {ticket?.csiDivision && (
+      <p style={{ margin: '0 0 4px', fontWeight: '600', color: '#1e40af' }}>
+        CSI Division: {ticket.csiDivision}
+      </p>
+    )}
+
+    {/* 2. Materials */}
+    <p style={{ margin: '0 0 4px', fontWeight: 'bold' }}>
+      Materials: {ticket?.material || 'Loading...'} ({ticket?.qty || ''})
     </p>
-    <p style={{ margin: '0 0 4px' }}>
-      <strong>CSI Division:</strong> {ticket?.csiDivision || 'N/A'}
-    </p>
+
+    {/* 3. Loading Equipment */}
+    {ticket?.loadingEquipment && (
+      <p style={{ margin: '0 0 4px', color: '#dc2626', fontWeight: 'bold' }}>
+        Loading Equipment: {ticket.loadingEquipment}
+      </p>
+    )}
+
+    {/* 4. Project */}
     <p style={{ margin: '0 0 4px' }}>
       <strong>Project:</strong> {ticket?.projectName || 'N/A'}
     </p>
+
+    {/* 5. Address */}
     <p style={{ margin: '0 0 4px' }}>
       <strong>Address:</strong> {ticket?.projectAddress || 'N/A'}
     </p>
-    <p style={{ margin: '0 0 4px' }}>
-      <strong>Equipment:</strong> {ticket?.loadingEquipment || 'None'}
-    </p>
+
+    {/* 6. Operating Hours — NEW FIELD */}
+    {ticket?.operatingHours ? (
+      <p style={{ margin: '0 0 4px' }}>
+        <strong>Operating Hours:</strong> {ticket.operatingHours}
+      </p>
+    ) : (
+      <p style={{ margin: '0 0 4px', color: '#6b7280' }}>
+        <strong>Operating Hours:</strong> Not specified
+      </p>
+    )}
+
+    {/* 7. Site Status — NEW FIELD */}
+    {ticket?.siteStatus && (
+      <p style={{
+        margin: '0 0 8px',
+        padding: '4px 8px',
+        borderRadius: '6px',
+        fontWeight: 'bold',
+        background: 
+          ticket.siteStatus === 'Open' ? '#dcfce7' :
+          ticket.siteStatus === 'Closed' ? '#fee2e2' :
+          ticket.siteStatus === 'Temporarily Closed' ? '#fef3c7' :
+          '#fde68a',
+        color:
+          ticket.siteStatus === 'Open' ? '#166534' :
+          ticket.siteStatus === 'Closed' ? '#991b1b' :
+          '#92400e',
+      }}>
+        Status: {ticket?.siteStatus || 'Open (default)'}
+      </p>
+    )}
+
+    {/* 8. Contacts */}
     {ticket?.projectContacts && ticket.projectContacts.length > 0 && (
       <div style={{ margin: '8px 0 0' }}>
         <strong>Contacts:</strong>
         <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
-          {ticket.projectContacts.map((contact: any, i: number) => (
+          {ticket.projectContacts.map((contact, i) => (
             <li key={i}>
-              {contact.name} ({contact.role}):{' '}
+              {contact.name} ({contact.role}){' '}
               <a href={`tel:${contact.phone}`} style={{ color: '#3b82f6' }}>
                 {contact.phone}
               </a>
@@ -850,26 +965,56 @@ return (
     )}
   </div>
 
-  <button
-    onClick={() => {
-      setClaimed(true);
-      // TODO: Real Firebase claim update
-    }}
-    disabled={claimed}
-    style={{
-      padding: '8px 16px',
-      fontSize: '14px',
-      fontWeight: 'bold',
-      color: 'white',
-      background: claimed ? '#d1d5db' : '#3b82f6',
-      border: 'none',
-      borderRadius: '20px',
-      alignSelf: 'flex-end',
-    }}
-  >
-    {claimed ? 'Claimed' : 'Claim Delivery'}
-  </button>
-</div>
+            {/* CLAIM / UNCLAIM + START — FINAL, NO ERRORS */}
+            <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <button
+                onClick={() => {
+                  if (claimed) {
+                    if (confirm('Are you sure you want to unclaim this delivery?')) {
+                      setClaimed(false);
+                    }
+                  } else {
+                    setClaimed(true);
+                  }
+                }}
+                style={{
+                  padding: '16px 40px',
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: 'white',
+                  background: claimed ? '#dc2626' : '#3b82f6',
+                  border: 'none',
+                  borderRadius: '30px',
+                  minWidth: '260px',
+                  boxShadow: claimed 
+                    ? '0 6px 20px rgba(220, 38, 38, 0.4)' 
+                    : '0 6px 20px rgba(59, 130, 246, 0.4)',
+                }}
+              >
+                {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
+              </button>
+
+              {claimed && !tracking && (
+                <button
+                  onClick={() => setTracking(true)}
+                  style={{
+                    padding: '18px 60px',
+                    fontSize: '22px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    background: '#16a34a',
+                    border: 'none',
+                    borderRadius: '30px',
+                    minWidth: '300px',
+                    boxShadow: '0 8px 28px rgba(22, 163, 74, 0.5)',
+                    marginTop: '8px',
+                  }}
+                >
+                  Start Navigation
+                </button>
+              )}
+            </div>
+          </div>
           </>
         )}
 
@@ -908,27 +1053,45 @@ return (
   <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
 </Sheet>
   
-    {/* Global Style for Touch Pass-Through */}
-        <style jsx global>{`
+      {/* Global Style for Touch Pass-Through */}
+      <style jsx global>{`
         .react-modal-sheet-backdrop {
-            pointer-events: none !important;
+          pointer-events: none !important;
         }
         .react-modal-sheet-container {
-            pointer-events: none !important;
+          pointer-events: none !important;
         }
         .react-modal-sheet-content > div {
-            pointer-events: auto !important;
+          pointer-events: auto !important;
         }
-        `}</style>
+      `}</style>
 
-        {/* Pulse Animation */}
-        <style jsx>{`
+      {/* Pulse Animation — for the cyan puck */}
+      <style jsx>{`
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
+          0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
         }
-        `}</style>
+      `}</style>
+
+      {/* RECENTER BUTTON GLOW — flashes green when off-center */}
+      <style jsx global>{`
+        @keyframes pulse-glow {
+          0% { 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4); 
+            border-color: #eee;
+          }
+          50% { 
+            box-shadow: 0 0 30px 10px rgba(34, 197, 94, 0.7); 
+            border-color: #22c55e;
+          }
+          100% { 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4); 
+            border-color: #eee;
+          }
+        }
+      `}</style>
     </div>
     );
   }

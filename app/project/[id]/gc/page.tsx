@@ -114,6 +114,8 @@ useEffect(() => {
           { name: "John GC", phone: "509-123-4567", role: "Superintendent" },
           { name: "Jane PM", phone: "509-987-6543", role: "Project Manager" },
         ],
+        siteStatus: "Open",   // ← THIS LINE MUST BE HERE, OUTSIDE THE ARRAY
+        operatingHours: "7:00 AM – 5:00 PM", // optional — for future
       });
 
       const shareUrl = `${window.location.origin}/driver?ticketId=${shortId}`;
