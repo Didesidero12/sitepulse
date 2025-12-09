@@ -1,11 +1,13 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
+import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Sheet } from 'react-modal-sheet';
 import mbxClient from '@mapbox/mapbox-sdk';
 import directionsClient from '@mapbox/mapbox-sdk/services/directions';
 import * as turf from '@turf/turf';
+import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,7 +24,6 @@ export default function DriverContent() {
   const [arrived, setArrived] = useState(false);
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false);
   const [headingUp, setHeadingUp] = useState(false);  // false = north-up, true = heading-up
-  const [mapLoaded, setMapLoaded] = useState(false);  // ← ADD THIS LINE
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -51,8 +52,6 @@ export default function DriverContent() {
   const mapRef = useRef<any>(null);
   const Map = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Map), { ssr: false });
   const Marker = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Marker), { ssr: false });
-  const Source = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Source), { ssr: false });
-  const Layer = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Layer), { ssr: false });
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
@@ -224,6 +223,7 @@ useEffect(() => {
         if (position) {
           animateMarker(position, newPos);
         } else {
+          // First position — instant set
           setPosition(newPos);
         }
 
@@ -250,15 +250,10 @@ useEffect(() => {
     return () => {
       navigator.geolocation.clearWatch(watchId);
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
-
+      console.log('GPS useEffect cleanup — watch cleared');
     };
   }
 }, [tracking]);
-
-//Add the UseEffect to Set mapLoaded to True
-useEffect(() => {
-  setMapLoaded(true);
-}, []);
 
 // UseEffect (Realtime Ticket Listener)
 useEffect(() => {
@@ -459,84 +454,68 @@ useLayoutEffect(() => {
 
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-    {/* Client-side only rendering for Mapbox components */}
-    {mapLoaded ? (
-      <Map
-        ref={mapRef}
-        initialViewState={{
-          latitude: destination.lat,
-          longitude: destination.lng,
-          zoom: 12,
-        }}
-        style={{ width: '100%', height: '100%' }}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
-        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-      >
-        {/* Cyan Arrow Marker */}
-        {tracking && position && (
-          <Marker
-            longitude={position.lng}
-            latitude={position.lat}
-            anchor="center"
-            rotationAlignment="map"
-            rotation={position.heading ?? 0}
-          >
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                background: 'cyan',
-                border: '5px solid white',
-                borderRadius: '50% 50% 50% 0',
-                transform: 'rotate(-45deg)',
-                boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
-              }}
-            />
-          </Marker>
-        )}
+    {/* Full-screen Map */}
+    <Map
+      ref={mapRef}
+      initialViewState={{
+        latitude: destination.lat,
+        longitude: destination.lng,
+        zoom: 12,
+      }}
+      style={{ width: '100%', height: '100%' }}
+      mapStyle="mapbox://styles/mapbox/streets-v12"
+      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+    >
+{tracking && position && (
+  <Marker
+    longitude={position.lng}
+    latitude={position.lat}
+    anchor="center"
+    rotationAlignment="map"
+    rotation={position.heading ?? 0}  // Rotates arrow based on heading
+  >
+    <div
+      style={{
+        width: '40px',
+        height: '40px',
+        background: 'cyan',
+        border: '5px solid white',
+        borderRadius: '50% 50% 50% 0',
+        transform: 'rotate(-45deg)',  // Creates arrow shape (point forward)
+        boxShadow: '0 0 25px rgba(0, 255, 255, 0.9)',
+      }}
+    />
+  </Marker>
+)}
+      {/* Red Destination Pin */}
+      <Marker longitude={destination.lng} latitude={destination.lat}>
+        <div
+          style={{
+            width: '24px',
+            height: '24px',
+            background: 'red',
+            border: '4px solid white',
+            borderRadius: '50%',
+            boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
+          }}
+        />
+      </Marker>
 
-        {/* Red Destination Pin */}
-        <Marker longitude={destination.lng} latitude={destination.lat}>
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              background: 'red',
-              border: '4px solid white',
-              borderRadius: '50%',
-              boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
-            }}
-          />
-        </Marker>
-
-        {/* Blue Route Line */}
+        {/* ← ADD THE BLUE ROUTE LINE HERE */}
         {route && (
-          <Source id="route" type="geojson" data={route}>
+            <Source id="route" type="geojson" data={route}>
             <Layer
-              id="route-line"
-              type="line"
-              paint={{
+                id="route-line"
+                type="line"
+                paint={{
                 'line-color': '#3887be',
                 'line-width': 6,
                 'line-opacity': 0.8,
-              }}
+                }}
             />
-          </Source>
+            </Source>
         )}
-      </Map>
-    ) : (
-      <div style={{ 
-        height: '100%', 
-        background: '#1a202c', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        color: 'white', 
-        fontSize: '20px' 
-      }}>
-        Loading map...
-      </div>
-    )}
+        </Map>
 
     {/* Floating Controls: 3D Toggle + Orientation Toggle + Re-Center */}
     {tracking && position && sheetSnap !== 0 && (
@@ -619,16 +598,16 @@ return (
       </div>
     )}
 
- {/* Bottom Sheet */}
+    {/* Bottom Sheet */}
     <Sheet
-      ref={sheetRef}
-      isOpen={true}
-      onClose={() => {}}
-      snapPoints={[0.6, 0.15]}
-      initialSnap={1}
-      onSnap={(index) => setSheetSnap(index)}
-      disableDismiss={true}
-      disableDrag={false}
+    ref={sheetRef}
+    isOpen={true}
+    onClose={() => {}}
+    snapPoints={[0, 0.15, 0.6, 1]}  // Fixed: ascending with 0 and 1
+    initialSnap={1}  // Start at peek (0.15)
+    onSnap={(index) => setSheetSnap(index)}
+    disableDismiss={true}
+    disableDrag={false}
     >
   <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
@@ -961,26 +940,27 @@ return (
   <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
 </Sheet>
   
-{/* Global Styles & Animations */}
-    <style jsx global>{`
-      .react-modal-sheet-backdrop {
-        pointer-events: none !important;
-      }
-      .react-modal-sheet-container {
-        pointer-events: none !important;
-      }
-      .react-modal-sheet-content > div {
-        pointer-events: auto !important;
-      }
-    `}</style>
+    {/* Global Style for Touch Pass-Through */}
+        <style jsx global>{`
+        .react-modal-sheet-backdrop {
+            pointer-events: none !important;
+        }
+        .react-modal-sheet-container {
+            pointer-events: none !important;
+        }
+        .react-modal-sheet-content > div {
+            pointer-events: auto !important;
+        }
+        `}</style>
 
-    <style jsx>{`
-          @keyframes pulse {
+        {/* Pulse Animation */}
+        <style jsx>{`
+        @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); }
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); }
-          }
+        }
         `}</style>
-      </div>
+    </div>
     );
   }
