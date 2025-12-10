@@ -59,7 +59,7 @@ export default function DriverContent() {
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
-  const mapRef = useRef<any>(null);  // YES — use `any` here
+  const mapRef = useRef<MapboxMap | null>(null);
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
@@ -244,7 +244,7 @@ const watchId = navigator.geolocation.watchPosition(
 useEffect(() => {
   if (!tracking || !mapRef.current || !currentPos) return;
 
-  const map = mapRef.current;
+  const map = mapRef.current.getMap();
 
   // Re-enable all interaction — driver can explore
   map.dragPan.enable();
@@ -775,7 +775,7 @@ return (
 
           // FINAL UNLOCK — MAP IS FREE AGAIN
           if (mapRef.current) {
-            const map = mapRef.current;
+            const map = mapRef.current.getMap();
             map.dragPan.enable();
             map.scrollZoom.enable();
             map.doubleClickZoom.enable();
