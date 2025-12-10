@@ -244,7 +244,7 @@ const watchId = navigator.geolocation.watchPosition(
 useEffect(() => {
   if (!tracking || !mapRef.current || !currentPos) return;
 
-  const map = mapRef.current?.getMap() || mapRef.current;
+  const map = mapRef.current;
   if (!map) return;
 
   // Re-enable all interaction — driver can explore
@@ -776,7 +776,7 @@ return (
 
           // FINAL UNLOCK — MAP IS FREE AGAIN
           if (mapRef.current) {
-            const map = mapRef.current?.getMap() || mapRef.current;
+            const map = mapRef.current;
             if (!map) return;  // ← ADD THIS
             map.dragPan.enable();
             map.scrollZoom.enable();
