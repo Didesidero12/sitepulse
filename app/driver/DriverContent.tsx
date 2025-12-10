@@ -13,6 +13,7 @@ import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, getDocs, query, wh
 
 import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
 import type { Map as MapboxMap } from 'mapbox-gl';
+import type { MapRef } from 'react-map-gl';
 import { Ticket, MapboxRoute } from '@/lib/types';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
@@ -59,7 +60,7 @@ export default function DriverContent() {
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
-  const mapRef = useRef<MapboxMap | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
