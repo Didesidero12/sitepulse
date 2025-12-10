@@ -245,6 +245,7 @@ useEffect(() => {
   if (!tracking || !mapRef.current || !currentPos) return;
 
   const map = mapRef.current?.getMap() || mapRef.current;
+  if (!map) return;
 
   // Re-enable all interaction — driver can explore
   map.dragPan.enable();
@@ -776,6 +777,7 @@ return (
           // FINAL UNLOCK — MAP IS FREE AGAIN
           if (mapRef.current) {
             const map = mapRef.current?.getMap() || mapRef.current;
+            if (!map) return;  // ← ADD THIS
             map.dragPan.enable();
             map.scrollZoom.enable();
             map.doubleClickZoom.enable();
