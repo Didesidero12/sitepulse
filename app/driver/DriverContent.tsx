@@ -14,6 +14,7 @@ import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, getDocs, query, wh
 import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { Ticket, MapboxRoute } from '@/lib/types';
+import type { MapRef } from 'react-map-gl';
 
 const directions = directionsClient({ accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN! });
 
@@ -59,7 +60,7 @@ export default function DriverContent() {
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
-  const mapRef = useRef<MapboxMap | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
 
  // Parse URL params (keep searchParams for other uses if needed)
 const searchParams = useSearchParams();
@@ -244,7 +245,7 @@ const watchId = navigator.geolocation.watchPosition(
 useEffect(() => {
   if (!tracking || !mapRef.current || !currentPos) return;
 
-  const map = mapRef.current;
+  const map = mapRef.current?.getMap();
   if (!map) return;
 
   // Re-enable all interaction — driver can explore
@@ -776,8 +777,8 @@ return (
 
           // FINAL UNLOCK — MAP IS FREE AGAIN
           if (mapRef.current) {
-            const map = mapRef.current;
-            if (!map) return;  // ← ADD THIS
+            const map = mapRef.current?.getMap();
+            if (!map) return;
             map.dragPan.enable();
             map.scrollZoom.enable();
             map.doubleClickZoom.enable();
