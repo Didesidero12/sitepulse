@@ -56,6 +56,7 @@ export default function DriverContent() {
   const [smoothedPos, setSmoothedPos] = useState<{ lng: number; lat: number } | null>(null);
   const animationRef = useRef<number>();
   const lastUpdateTime = useRef<number>(0);
+  const lastLocationWrite = useRef<number>(0);  // ← ADD THIS LINE
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
@@ -165,6 +166,22 @@ const watchId = navigator.geolocation.watchPosition(
     if (heading !== null) setHeading(heading);
     const newRawPos = { lng: longitude, lat: latitude };
 
+    // ──────────────────────────────────────────────────────────────
+    // REAL-TIME FIRESTORE WRITE — THIS MAKES SUPER WAR ROOM SEE YOU
+    // ──────────────────────────────────────────────────────────────
+    if (ticket?.id) {
+      const now = Date.now();
+      if (!lastLocationWrite.current || now - lastLocationWrite.current > 10000) {
+        updateDoc(doc(db, 'tickets', ticket.id), {
+          driverLocation: { lat: newRawPos.lat, lng: newRawPos.lng },
+          lastLocationUpdate: serverTimestamp(),
+          status: tracking ? 'claimed-tracking' : 'claimed-untracking',
+        }).catch(err => console.warn('Location write failed:', err));
+        lastLocationWrite.current = now;
+      }
+    }
+    // ──────────────────────────────────────────────────────────────
+    
     // 1. Update all position states (raw + legacy sync)
     setCurrentPos(newRawPos);
     setPosition(newRawPos); // ← keeps old references working (we delete this line forever in 2 minutes)
@@ -374,27 +391,33 @@ useEffect(() => {
   };
 }, [searchParams]);
 
-// Dynamic destination from ticket — supports GC mid-route changes
+// Dynamic destination from ticket — 100% safe, no more NaN crashes
 useEffect(() => {
-  if (ticket?.siteCoords) {
-    const newDest = {
-      lat: ticket.siteCoords.lat,
-      lng: ticket.siteCoords.lng,
-    };
+  if (!ticket?.siteCoords) {
+    console.warn("No siteCoords in ticket — using Kennewick fallback");
+    setDestination({ lat: 46.21667, lng: -119.22323 });
+    return;
+  }
 
-    // Only update if coords actually changed (prevents unnecessary reroutes)
-    if (
-      destination.lat !== newDest.lat ||
-      destination.lng !== newDest.lng
-    ) {
-      setDestination(newDest);
+  const lat = Number(ticket.siteCoords.lat);
+  const lng = Number(ticket.siteCoords.lng);
 
-      // Notify driver if already tracking
-      if (tracking) {
-        alert(
-          `Destination updated by GC!\nNew drop zone received. Route recalculating...`
-        );
-      }
+  // If either coord is invalid, fall back to Kennewick
+  if (isNaN(lat) || isNaN(lng)) {
+    console.warn("Invalid coordinates in ticket:", ticket.siteCoords, "using Kennewick");
+    setDestination({ lat: 46.21667, lng: -119.22323 });
+    return;
+  }
+
+  const newDest = { lat, lng };
+
+  // Only update if actually different
+  if (destination.lat !== newDest.lat || destination.lng !== newDest.lng) {
+    console.log("Updating destination to:", newDest);
+    setDestination(newDest);
+
+    if (tracking) {
+      alert("Destination updated by GC!\nNew drop zone received. Route recalculating...");
     }
   }
 }, [ticket?.siteCoords, tracking]);
@@ -455,13 +478,13 @@ return (
     {/* Full-screen Map */}
 <Map
   ref={mapRef}
-  initialViewState={{
-    latitude: destination.lat,
-    longitude: destination.lng,
-    zoom: 12,
-    bearing: 0,
-    pitch: 0,
-  }}
+initialViewState={{
+  latitude: typeof destination.lat === 'number' && !isNaN(destination.lat) ? destination.lat : 46.21667,
+  longitude: typeof destination.lng === 'number' && !isNaN(destination.lng) ? destination.lng : -119.22323,
+  zoom: 12,
+  bearing: 0,
+  pitch: 0,
+}}
   // LIVE bearing & pitch — Mapbox handles the smooth transition natively
   bearing={bearingMode === 'north' ? 0 : (heading || 0)}
   pitch={bearingMode === '3d' ? 60 : 0}
@@ -826,234 +849,134 @@ return (
   </div>
 )}
 
-      {/* TICKET SUMMARY — ALWAYS VISIBLE */}
-      {true && (   // ← changed from {!tracking && (}
-          <>
-            <h2 style={{ margin: '8px 0 4px', fontSize: '18px', fontWeight: 'bold' }}>Driver Navigation</h2>
-            <p style={{ color: '#666', margin: '0 0 16px', fontSize: '14px' }}>
-              Tap below to begin tracking and navigation
+         {/* TICKET SUMMARY — FINAL, PERFECT FLOW */}
+        <div style={{
+          background: '#f3f4f6',
+          borderRadius: '12px',
+          padding: '16px',
+          marginTop: '16px',
+        }}>
+          <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+            {ticket?.csiDivision && (
+              <p style={{ margin: '0 0 8px', fontWeight: '600', color: '#1e40af' }}>
+                CSI Division: {ticket.csiDivision}
+              </p>
+            )}
+
+            <p style={{ margin: '0 0 8px', fontWeight: 'bold', fontSize: '16px' }}>
+              Materials: {ticket?.material} ({ticket?.qty})
             </p>
 
-{!tracking && (
-  <>
-    {/* Trip Summary Card (Pre-Tracking) */}
-    <div style={{
-      background: '#f3f4f6',
-      borderRadius: '12px',
-      padding: '16px',
-      marginBottom: '16px'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
-            {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
-          </p>
-          <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
-            {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            if (claimed) {
-              console.log('Start button clicked — setting tracking to true');
-              setTracking(true);
-            }
-          }}
-          disabled={!claimed}
-          style={{
-            padding: '10px 20px',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            color: 'white',
-            background: claimed ? '#16a34a' : '#d1d5db',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: claimed ? 'pointer' : 'not-allowed',
-          }}
-        >
-          Start
-        </button>
-      </div>
-    </div>
-  </>
-)}
+            {ticket?.loadingEquipment && (
+              <p style={{ margin: '0 0 8px', color: '#dc2626', fontWeight: 'bold' }}>
+                Loading Equipment: {ticket.loadingEquipment}
+              </p>
+            )}
 
-{/* TICKET SUMMARY — ALWAYS VISIBLE, NEW PERFECT ORDER */}
-<div style={{
-  background: '#f3f4f6',
-  borderRadius: '12px',
-  padding: '12px',
-  fontSize: '14px',
-  color: '#333',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '8px',
-}}>
-  <div>
-    {/* 1. CSI Division */}
-    {ticket?.csiDivision && (
-      <p style={{ margin: '0 0 4px', fontWeight: '600', color: '#1e40af' }}>
-        CSI Division: {ticket.csiDivision}
-      </p>
-    )}
+            <p style={{ margin: '0 0 8px' }}>
+              <strong>Project:</strong> {ticket?.projectName}
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
+              <strong>Address:</strong> {ticket?.projectAddress}
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
+              <strong>Operating Hours:</strong> {ticket?.operatingHours || 'Not specified'}
+            </p>
 
-    {/* 2. Materials */}
-    <p style={{ margin: '0 0 4px', fontWeight: 'bold' }}>
-      Materials: {ticket?.material || 'Loading...'} ({ticket?.qty || ''})
-    </p>
+            {ticket?.siteStatus && (
+              <p style={{
+                margin: '0 0 12px',
+                padding: '6px 10px',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                background: ticket.siteStatus === 'Open' ? '#dcfce7' : '#fee2e2',
+                color: ticket.siteStatus === 'Open' ? '#166534' : '#991b1b',
+                display: 'inline-block',
+              }}>
+                Status: {ticket.siteStatus}
+              </p>
+            )}
 
-    {/* 3. Loading Equipment */}
-    {ticket?.loadingEquipment && (
-      <p style={{ margin: '0 0 4px', color: '#dc2626', fontWeight: 'bold' }}>
-        Loading Equipment: {ticket.loadingEquipment}
-      </p>
-    )}
+            {ticket?.projectContacts?.length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <strong>Contacts:</strong>
+                <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
+                  {ticket.projectContacts.map((c, i) => (
+                    <li key={i}>
+                      {c.name} ({c.role}) —{' '}
+                      <a href={`tel:${c.phone}`} style={{ color: '#3b82f6' }}>
+                        {c.phone}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
 
-    {/* 4. Project */}
-    <p style={{ margin: '0 0 4px' }}>
-      <strong>Project:</strong> {ticket?.projectName || 'N/A'}
-    </p>
+          {/* CLAIM / UNCLAIM + START */}
+          <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+            <button
+              onClick={() => {
+                if (claimed) {
+                  if (confirm('Unclaim this delivery?')) setClaimed(false);
+                } else {
+                  setClaimed(true);
+                }
+              }}
+              style={{
+                padding: '16px 40px',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                color: 'white',
+                background: claimed ? '#dc2626' : '#3b82f6',
+                border: 'none',
+                borderRadius: '30px',
+                minWidth: '260px',
+              }}
+            >
+              {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
+            </button>
 
-    {/* 5. Address */}
-    <p style={{ margin: '0 0 4px' }}>
-      <strong>Address:</strong> {ticket?.projectAddress || 'N/A'}
-    </p>
-
-    {/* 6. Operating Hours — NEW FIELD */}
-    {ticket?.operatingHours ? (
-      <p style={{ margin: '0 0 4px' }}>
-        <strong>Operating Hours:</strong> {ticket.operatingHours}
-      </p>
-    ) : (
-      <p style={{ margin: '0 0 4px', color: '#6b7280' }}>
-        <strong>Operating Hours:</strong> Not specified
-      </p>
-    )}
-
-    {/* 7. Site Status — NEW FIELD */}
-    {ticket?.siteStatus && (
-      <p style={{
-        margin: '0 0 8px',
-        padding: '4px 8px',
-        borderRadius: '6px',
-        fontWeight: 'bold',
-        background: 
-          ticket.siteStatus === 'Open' ? '#dcfce7' :
-          ticket.siteStatus === 'Closed' ? '#fee2e2' :
-          ticket.siteStatus === 'Temporarily Closed' ? '#fef3c7' :
-          '#fde68a',
-        color:
-          ticket.siteStatus === 'Open' ? '#166534' :
-          ticket.siteStatus === 'Closed' ? '#991b1b' :
-          '#92400e',
-      }}>
-        Status: {ticket?.siteStatus || 'Open (default)'}
-      </p>
-    )}
-
-    {/* 8. Contacts */}
-    {ticket?.projectContacts && ticket.projectContacts.length > 0 && (
-      <div style={{ margin: '8px 0 0' }}>
-        <strong>Contacts:</strong>
-        <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
-          {ticket.projectContacts.map((contact, i) => (
-            <li key={i}>
-              {contact.name} ({contact.role}){' '}
-              <a href={`tel:${contact.phone}`} style={{ color: '#3b82f6' }}>
-                {contact.phone}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-  </div>
-
-            {/* CLAIM / UNCLAIM + START — FINAL, NO ERRORS */}
-            <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+            {claimed && !tracking && (
               <button
-                onClick={() => {
-                  if (claimed) {
-                    if (confirm('Are you sure you want to unclaim this delivery?')) {
-                      setClaimed(false);
-                    }
-                  } else {
-                    setClaimed(true);
-                  }
-                }}
+                onClick={() => setTracking(true)}
                 style={{
-                  padding: '16px 40px',
-                  fontSize: '20px',
+                  padding: '18px 60px',
+                  fontSize: '22px',
                   fontWeight: 'bold',
                   color: 'white',
-                  background: claimed ? '#dc2626' : '#3b82f6',
+                  background: '#16a34a',
                   border: 'none',
                   borderRadius: '30px',
-                  minWidth: '260px',
-                  boxShadow: claimed 
-                    ? '0 6px 20px rgba(220, 38, 38, 0.4)' 
-                    : '0 6px 20px rgba(59, 130, 246, 0.4)',
+                  minWidth: '300px',
+                  boxShadow: '0 8px 28px rgba(22,163,74,0.5)',
                 }}
               >
-                {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
+                Start Navigation
               </button>
-
-              {claimed && !tracking && (
-                <button
-                  onClick={() => setTracking(true)}
-                  style={{
-                    padding: '18px 60px',
-                    fontSize: '22px',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    background: '#16a34a',
-                    border: 'none',
-                    borderRadius: '30px',
-                    minWidth: '300px',
-                    boxShadow: '0 8px 28px rgba(22, 163, 74, 0.5)',
-                    marginTop: '8px',
-                  }}
-                >
-                  Start Navigation
-                </button>
-              )}
-            </div>
+            )}
           </div>
-          </>
-        )}
+        </div>
 
-        {/* Expanded-Only Content */}
-        {sheetSnap === 0 && tracking && position && (
-          <div style={{ marginTop: '16px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
-            Lat: {position.lat.toFixed(6)} • Lng: {position.lng.toFixed(6)}
-          </div>
-        )}
-        {/* Full Turn-by-Turn List - Only When Sheet Expanded */}
+        {/* Turn-by-turn */}
         {sheetSnap === 0 && instructions.length > 0 && (
-        <div style={{ marginTop: '20px', padding: '0 4px' }}>
+          <div style={{ marginTop: '20px', padding: '0 4px' }}>
             <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold' }}>
-            Turn-by-Turn Directions
+              Turn-by-Turn Directions
             </h3>
             <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '15px', lineHeight: '1.6' }}>
-            {instructions.map((inst, i) => (
-                <li
-                key={i}
-                style={{
-                    marginBottom: '10px',
-                    color: i === 0 ? '#2563eb' : '#333',
-                    fontWeight: i === 0 ? 'bold' : 'normal',
-                }}
-                >
-                {inst}
+              {instructions.map((inst, i) => (
+                <li key={i} style={{ marginBottom: '10px', color: i === 0 ? '#2563eb' : '#333', fontWeight: i === 0 ? 'bold' : 'normal' }}>
+                  {inst}
                 </li>
-            ))}
+              ))}
             </ol>
-        </div>
+          </div>
         )}
       </div>
     </Sheet.Content>
   </Sheet.Container>
-
   <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
 </Sheet>
   
