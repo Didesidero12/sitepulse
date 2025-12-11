@@ -473,6 +473,36 @@ useLayoutEffect(() => {
   }
 }, [tracking]);
 
+const handleStop = () => {
+  setTracking(false);
+  setCurrentPos(null);
+  setSmoothedPos(null);
+  setPosition(null);
+  setRoute(null);
+  setEtaMinutes(null);
+  setDistanceMiles(null);
+  setArrivalTime('--:-- AM');
+  setInstructions([]);
+  setNextInstruction('Follow the route');
+  setArrived(false);
+  setShowArrivalConfirm(false);
+  setNotified30Min(false);
+  setNotified5Min(false);
+
+  // UNLOCK MAP
+  if (mapRef.current) {
+    const map = mapRef.current;
+    if (map) {
+      map.dragPan.enable();
+      map.scrollZoom.enable();
+      map.doubleClickZoom.enable();
+      map.touchZoomRotate.enable();
+      map.keyboard.enable();
+    }
+  }
+  setHasFirstFix(false);
+};
+
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
     {/* Full-screen Map */}
@@ -654,209 +684,105 @@ initialViewState={{
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
 
     <Sheet.Content>
-      <div style={{ padding: '12px', paddingTop: 8 }}>  {/* Tighter padding */}
+        {/* TICKET SUMMARY — FINAL, PERFECT FLOW */}
+        <div style={{ padding: '12px', paddingTop: 8 }}>
+          {/* Drag Handle */}
+          <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+            <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
+          </div>
 
-        {/* Drag Handle - Always First & Visible */}
-        <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
-          <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
-        </div>
+          {/* PRE-START ETA ROW WITH START BUTTON */}
+          {!tracking && (
+            <div style={{
+              background: '#f3f4f6',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
+                    {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
+                  </p>
+                  <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
+                    {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
+                  </p>
+                </div>
+                {claimed && (
+                  <button
+                    onClick={() => setTracking(true)}
+                    style={{
+                      padding: '12px 28px',
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      background: '#16a34a',
+                      border: 'none',
+                      borderRadius: '30px',
+                      boxShadow: '0 6px 20px rgba(22,163,74,0.4)',
+                    }}
+                  >
+                    Start
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
-{/* Live ETA Row - Only When Tracking */}
-{tracking && (
-  <div style={{
-    background: '#ecfdf5',
-    borderRadius: '12px',
-    padding: '14px',
-    border: '1px solid #86efac',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ flex: 1 }}>
-        <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', lineHeight: '1' }}>
-          {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
-        </p>
-        <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
-          {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
-        </p>
+          {/* LIVE ETA + STOP */}
+          {tracking && (
+            <div style={{
+              background: '#ecfdf5',
+              borderRadius: '16px',
+              padding: '20px',
+              border: '2px solid #86efac',
+              marginBottom: '16px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <p style={{ fontSize: '36px', fontWeight: 'bold', margin: '0' }}>
+                    {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
+                  </p>
+                  <p style={{ fontSize: '16px', color: '#666', margin: '6px 0 0' }}>
+                    {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
+                  </p>
+                  {nextInstruction && (
+                    <p style={{ fontSize: '17px', color: '#333', margin: '12px 0 0', fontWeight: '600' }}>
+                      ➤ {nextInstruction}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={handleStop}
+                  style={{
+                    padding: '16px 36px',
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    background: '#dc2626',
+                    border: 'none',
+                    borderRadius: '30px',
+                  }}
+                >
+                  Stop
+                </button>
+              </div>
+            </div>
+          )}
 
-        {/* ← ADD NEXT TURN PREVIEW HERE */}
-        {instructions.length > 0 && (
-          <p style={{ fontSize: '15px', color: '#333', margin: '8px 0 0', fontWeight: '500', lineHeight: '1.3' }}>
-            ➤ {nextInstruction}
-          </p>
-        )}
-      </div>
-
-
-
- {/* Stop / Arrival Button Flow — NOW WITH FULL CLEANUP */}
-{showArrivalConfirm ? (
-  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-    <button
-      onClick={async () => {
-        const ticketId = searchParams.get('ticketId');
-        if (!ticketId) {
-          alert('Error: No ticket ID found.');
-          setTracking(false);
-          setShowArrivalConfirm(false);
-          return;
-        }
-
-        try {
-          await updateDoc(doc(db, 'tickets', ticketId), {
-            status: 'delivered',
-            deliveredAt: serverTimestamp(),
-          });
-          alert('Arrival confirmed! Ticket delivered.');
-        } catch (err) {
-          console.error('Failed to update ticket:', err);
-          alert('Error confirming delivery.');
-        } finally {
-          // FULL CLEAN RESET
-          setTracking(false);
-          setCurrentPos(null);
-          setSmoothedPos(null);
-          setPosition(null);
-          setRoute(null);
-          setEtaMinutes(null);
-          setDistanceMiles(null);
-          setArrivalTime('--:-- AM');
-          setInstructions([]);
-          setNextInstruction('Follow the route');
-          setArrived(false);
-          setShowArrivalConfirm(false);
-          setNotified30Min(false);
-          setNotified5Min(false);
-        }
-      }}
-      style={{
-        padding: '14px 28px',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        color: 'white',
-        background: '#2563eb',
-        border: 'none',
-        borderRadius: '20px',
-        minWidth: '160px',
-      }}
-    >
-      Confirm Arrival
-    </button>
-    <button
-      onClick={() => setShowArrivalConfirm(false)}
-      style={{
-        padding: '14px 28px',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        color: '#333',
-        background: '#e5e7eb',
-        border: 'none',
-        borderRadius: '20px',
-        minWidth: '120px',
-      }}
-    >
-      Not Yet
-    </button>
-  </div>
-) : arrived ? (
-  <button
-    onClick={async () => {
-      // Same as Confirm Arrival above — reuse the same cleanup logic
-      // (Just copy the onClick from Confirm Arrival button if you want)
-      alert('Use Confirm Arrival button above');
-    }}
-    style={{
-      padding: '14px 28px',
-      fontSize: '18px',
-      fontWeight: 'bold',
-      color: 'white',
-      background: '#2563eb',
-      border: 'none',
-      borderRadius: '20px',
-    }}
-  >
-    I'VE ARRIVED
-  </button>
-    ) : (
-      <button
-        onClick={() => {
-          setTracking(false);
-          setCurrentPos(null);
-          setSmoothedPos(null);
-          setPosition(null);
-          setRoute(null);
-          setEtaMinutes(null);
-          setDistanceMiles(null);
-          setArrivalTime('--:-- AM');
-          setInstructions([]);
-          setNextInstruction('Follow the route');
-          setArrived(false);
-          setShowArrivalConfirm(false);
-          setNotified30Min(false);
-          setNotified5Min(false);
-
-          // FINAL UNLOCK — MAP IS FREE AGAIN
-          if (mapRef.current) {
-            const map = mapRef.current?.getMap();
-            if (!map) return;
-            map.dragPan.enable();
-            map.scrollZoom.enable();
-            map.doubleClickZoom.enable();
-            map.touchZoomRotate.enable();
-            map.keyboard.enable();
-          }
-          setHasFirstFix(false);
-        }}
-        style={{
-          padding: '14px 32px',        // a bit bigger, feels premium
-          fontSize: '18px',
-          fontWeight: 'bold',
-          color: 'white',
-          background: '#dc2626',       // bright red
-          border: 'none',
-          borderRadius: '28px',
-          boxShadow: '0 4px 12px rgba(220, 38, 38, 0.4)',
-          minWidth: '140px',
-        }}
-      >
-        Stop
-      </button>
-    )}
-    </div>
-
-    {/* Dynamic Equipment / Site Assistance Warning — Only when arrived */}
-    {arrived && (
-      <div style={{
-        background: '#fef9c3',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid #facc15',
-        color: '#713f12',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        fontSize: '14px',
-        marginTop: '12px',
-      }}>
-        ⚠️ <strong>
-          {ticket?.loadingEquipment 
-            ? `${ticket.loadingEquipment} Alert` 
-            : 'Site Assistance Required'}
-        </strong>: Heavy machinery active on site — stay vigilant!
-      </div>
-    )}
-  </div>
-)}
-
-         {/* TICKET SUMMARY — FINAL, PERFECT FLOW */}
+        {/* TICKET SUMMARY + BUTTONS — FINAL, PERFECT, BUTTONS ON RIGHT */}
         <div style={{
           background: '#f3f4f6',
           borderRadius: '12px',
           padding: '16px',
           marginTop: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '20px',
         }}>
-          <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+          {/* LEFT: ALL TICKET INFO */}
+          <div style={{ flex: 1, fontSize: '15px', lineHeight: '1.6' }}>
             {ticket?.csiDivision && (
               <p style={{ margin: '0 0 8px', fontWeight: '600', color: '#1e40af' }}>
                 CSI Division: {ticket.csiDivision}
@@ -864,7 +790,7 @@ initialViewState={{
             )}
 
             <p style={{ margin: '0 0 8px', fontWeight: 'bold', fontSize: '16px' }}>
-              Materials: {ticket?.material} ({ticket?.qty})
+              Materials: {ticket?.material || '—'} ({ticket?.qty || '—'})
             </p>
 
             {ticket?.loadingEquipment && (
@@ -874,10 +800,10 @@ initialViewState={{
             )}
 
             <p style={{ margin: '0 0 8px' }}>
-              <strong>Project:</strong> {ticket?.projectName}
+              <strong>Project:</strong> {ticket?.projectName || '—'}
             </p>
             <p style={{ margin: '0 0 8px' }}>
-              <strong>Address:</strong> {ticket?.projectAddress}
+              <strong>Address:</strong> {ticket?.projectAddress || '—'}
             </p>
             <p style={{ margin: '0 0 8px' }}>
               <strong>Operating Hours:</strong> {ticket?.operatingHours || 'Not specified'}
@@ -885,7 +811,7 @@ initialViewState={{
 
             {ticket?.siteStatus && (
               <p style={{
-                margin: '0 0 12px',
+                margin: '8px 0',
                 padding: '6px 10px',
                 borderRadius: '8px',
                 fontWeight: 'bold',
@@ -900,11 +826,11 @@ initialViewState={{
             {ticket?.projectContacts?.length > 0 && (
               <div style={{ marginTop: '12px' }}>
                 <strong>Contacts:</strong>
-                <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
+                <ul style={{ margin: '8px 0 0', paddingLeft: '20px', listStyle: 'none' }}>
                   {ticket.projectContacts.map((c, i) => (
-                    <li key={i}>
-                      {c.name} ({c.role}) —{' '}
-                      <a href={`tel:${c.phone}`} style={{ color: '#3b82f6' }}>
+                    <li key={i} style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: '600' }}>{c.name} ({c.role})</div>
+                      <a href={`tel:${c.phone}`} style={{ color: '#3b82f6', textDecoration: 'underline' }}>
                         {c.phone}
                       </a>
                     </li>
@@ -914,8 +840,8 @@ initialViewState={{
             )}
           </div>
 
-          {/* CLAIM / UNCLAIM + START */}
-          <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          {/* RIGHT: CLAIM/UNCLAIM + START — TIGHT AND BEAUTIFUL */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
             <button
               onClick={() => {
                 if (claimed) {
@@ -925,14 +851,15 @@ initialViewState={{
                 }
               }}
               style={{
-                padding: '16px 40px',
-                fontSize: '20px',
+                padding: '14px 32px',
+                fontSize: '18px',
                 fontWeight: 'bold',
                 color: 'white',
                 background: claimed ? '#dc2626' : '#3b82f6',
                 border: 'none',
                 borderRadius: '30px',
-                minWidth: '260px',
+                minWidth: '220px',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
               }}
             >
               {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
@@ -942,14 +869,14 @@ initialViewState={{
               <button
                 onClick={() => setTracking(true)}
                 style={{
-                  padding: '18px 60px',
-                  fontSize: '22px',
+                  padding: '16px 40px',
+                  fontSize: '20px',
                   fontWeight: 'bold',
                   color: 'white',
                   background: '#16a34a',
                   border: 'none',
                   borderRadius: '30px',
-                  minWidth: '300px',
+                  minWidth: '240px',
                   boxShadow: '0 8px 28px rgba(22,163,74,0.5)',
                 }}
               >
