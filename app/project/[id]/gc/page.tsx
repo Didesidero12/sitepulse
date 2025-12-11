@@ -12,6 +12,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import generateShortId from '@/utils/generateShortId';
 import type { Project } from '@/lib/types';
+import type { Ticket } from '@/lib/types';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
@@ -21,8 +22,8 @@ export default function SuperWarRoom() {
  const map = useRef<mapboxgl.Map | null>(null);
 
  // STATE — CLEAN & FINAL
- const [deliveries, setDeliveries] = useState<any[]>([]);
- const [unclaimedTickets, setUnclaimedTickets] = useState<any[]>([]);
+ const [deliveries, setDeliveries] = useState<Ticket[]>([]);
+ const [unclaimedTickets, setUnclaimedTickets] = useState<Ticket[]>([]);
  const [activeTab, setActiveTab] = useState<"enroute" | "unclaimed">("enroute");
  const [activeAlerts, setActiveAlerts] = useState<string[]>([]);
  const [siteLocation, setSiteLocation] = useState({ lat: 46.21667, lng: -119.22323 }); // Kennewick for testing
