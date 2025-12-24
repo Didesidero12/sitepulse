@@ -13,7 +13,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import generateShortId from '@/utils/generateShortId';
 import * as turf from '@turf/turf'; // For distance sorting in Live
-import { deleteDoc } from 'firebase/firestore';
+
 import type { Project } from '@/lib/types';
 import type { Ticket } from '@/lib/types';
 
@@ -33,7 +33,6 @@ export default function SuperWarRoom() {
   const [activeAlerts, setActiveAlerts] = useState<string[]>([]);
   const [siteLocation, setSiteLocation] = useState({ lat: 46.21667, lng: -119.22323 });
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // RESOLVE PROJECT ID
   useEffect(() => {
@@ -264,17 +263,6 @@ export default function SuperWarRoom() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ADD THIS BLOCK — Outside click to close menu
-useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    if (openMenuId && !(event.target as Element).closest('.menu-dropdown')) {
-      setOpenMenuId(null);
-    }
-  };
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, [openMenuId]);
-
   // FUNCTIONS
   const createQuickTicket = async () => {
     if (!projectId) {
@@ -360,36 +348,19 @@ useEffect(() => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%' }}>
-    {/* Header */}
-    <div style={{ 
-      backgroundColor: '#6B21A8', 
-      padding: '1rem 2rem',  // Narrower top/bottom
-      display: 'flex', 
-      justifyContent: 'space-between', 
-      alignItems: 'center', 
-      color: 'white',
-      position: 'relative'  // For potential absolute button if flex doesn't fit
-    }}>
-      <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0 }}>SUPER WAR ROOM</h1>
-      <p style={{ fontSize: '1.25rem', margin: '0 1rem' }}>
-        Project {projectId || id} — {deliveries.length} en route
-      </p>
-      <button
-        onClick={createQuickTicket}
-        style={{ 
-          backgroundColor: '#16A34A', 
-          color: 'white', 
-          fontSize: '1rem', 
-          fontWeight: 'bold', 
-          padding: '0.75rem 1.5rem', 
-          borderRadius: '0.75rem', 
-          boxShadow: '0 0 10px rgba(0,0,0,0.2)',
-          whiteSpace: 'nowrap'  // Prevent wrapping
-        }}
-      >
-        + Quick Ticket
-      </button>
-</div>
+      {/* Header */}
+      <div style={{ backgroundColor: '#6B21A8', padding: '2rem', textAlign: 'center', color: 'white' }}>
+        <h1 style={{ fontSize: '3rem', fontWeight: 'bold' }}>SUPER WAR ROOM</h1>
+        <p style={{ fontSize: '1.875rem', marginTop: '0.5rem' }}>
+          Project {projectId || id} — {deliveries.length} en route
+        </p>
+        <button
+          onClick={createQuickTicket}
+          style={{ marginTop: '2rem', backgroundColor: '#16A34A', color: 'white', fontSize: '1.25rem', fontWeight: 'bold', padding: '1rem 2.5rem', borderRadius: '1rem', transition: 'background-color 0.3s', boxShadow: '0 0 10px rgba(0,0,0,0.2)' }}
+        >
+          + Quick Ticket
+        </button>
+      </div>
 
       {/* Main Content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -431,116 +402,16 @@ useEffect(() => {
                 <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '1.25rem' }}>No live deliveries</p>
               ) : (
                 liveTickets.map((t) => (
-                <div 
-                  key={t.id} 
-                  style={{ 
-                    backgroundColor: '#374151', 
-                    padding: '1.25rem', 
-                    borderRadius: '0.75rem', 
-                    position: 'relative'
-                  }}
-                >
-                  {/* 3 Dots Menu Button */}
-                  <button
-                    onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                    style={{ 
-                      position: 'absolute', 
-                      top: '0.5rem', 
-                      right: '0.5rem', 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#9CA3AF', 
-                      fontSize: '1.5rem', 
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      borderRadius: '0.25rem',
-                      lineHeight: '1'
-                    }}
-                    aria-label="Ticket options"
-                  >
-                    ⋮
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {openMenuId === t.id && (
-                    <div 
-                      className="menu-dropdown" 
-                      style={{ 
-                        position: 'absolute', 
-                        top: '2.5rem', 
-                        right: '0.5rem', 
-                        backgroundColor: '#1F2937', 
-                        borderRadius: '0.5rem', 
-                        boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
-                        zIndex: 50,
-                        minWidth: '140px',
-                        border: '1px solid #4B5563'
-                      }}
+                  <div key={t.id} style={{ backgroundColor: '#374151', padding: '1rem', borderRadius: '0.5rem' }}>
+                    <p style={{ fontWeight: 'bold' }}>{t.material} — {t.qty}</p>
+                    <p style={{ fontSize: '0.875rem', color: '#D1D5DB' }}>ETA: {t.anticipatedTime || "ASAP"}</p>
+                    <button
+                      onClick={() => zoomToDriver(t)}
+                      style={{ marginTop: '0.5rem', backgroundColor: '#06B6D4', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontWeight: 'medium' }}
                     >
-                      <button
-                        onClick={() => {
-                          alert('Edit ticket — coming soon! 🚧');
-                          setOpenMenuId(null);
-                        }}
-                        style={{ 
-                          display: 'block', 
-                          width: '100%', 
-                          padding: '0.75rem 1rem', 
-                          background: 'none', 
-                          border: 'none', 
-                          color: '#E5E7EB', 
-                          textAlign: 'left', 
-                          cursor: 'pointer',
-                          fontSize: '0.95rem'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        ✏️ Edit
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (confirm('Permanently delete this live ticket? Driver will lose tracking.')) {
-                            try {
-                              await deleteDoc(doc(db, 'tickets', t.id));
-                              alert('Ticket deleted');
-                            } catch (err) {
-                              console.error(err);
-                              alert('Delete failed');
-                            }
-                          }
-                          setOpenMenuId(null);
-                        }}
-                        style={{ 
-                          display: 'block', 
-                          width: '100%', 
-                          padding: '0.75rem 1rem', 
-                          background: 'none', 
-                          border: 'none', 
-                          color: '#EF4444', 
-                          textAlign: 'left', 
-                          cursor: 'pointer',
-                          fontSize: '0.95rem',
-                          fontWeight: '500'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#7F1D1D'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Live Ticket Content */}
-                  <p style={{ fontWeight: 'bold' }}>{t.material} — {t.qty}</p>
-                  <p style={{ fontSize: '0.875rem', color: '#D1D5DB' }}>ETA: {t.anticipatedTime || "ASAP"}</p>
-                  <button
-                    onClick={() => zoomToDriver(t)}
-                    style={{ marginTop: '0.5rem', backgroundColor: '#06B6D4', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontWeight: 'medium' }}
-                  >
-                    Zoom to Driver
-                  </button>
-                </div>
+                      Zoom to Driver
+                    </button>
+                  </div>
                 ))
               )}
             </div>
@@ -558,53 +429,15 @@ useEffect(() => {
                     </h3>
                     <div style={{ display: 'grid', gap: '1rem' }}>
                       {tickets.map((t) => (
-                      <div 
-                        key={t.id} 
-                        style={{ 
-                          backgroundColor: '#374151', 
-                          padding: '1.25rem', 
-                          borderRadius: '0.75rem', 
-                          position: 'relative'
-                        }}
-                      >
-                        {/* Same 3-dots button and menu as above — copy exactly */}
-                        <button
-                          onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                          style={{ 
-                            position: 'absolute', 
-                            top: '0.5rem', 
-                            right: '0.5rem', 
-                            background: 'none', 
-                            border: 'none', 
-                            color: '#9CA3AF', 
-                            fontSize: '1.5rem', 
-                            cursor: 'pointer',
-                            padding: '0.25rem',
-                            borderRadius: '0.25rem',
-                            lineHeight: '1'
-                          }}
-                          aria-label="Ticket options"
-                        >
-                          ⋮
-                        </button>
-
-                        {openMenuId === t.id && (
-                          <div className="menu-dropdown" style={{ /* same styles as above */ }}>
-                            {/* Same Edit and Delete buttons — copy from Live */ }
-                            <button onClick={() => { alert('Edit ticket — coming soon! 🚧'); setOpenMenuId(null); }} /* ... */ >✏️ Edit</button>
-                            <button onClick={async () => { if (confirm('Delete this claimed ticket?')) { await deleteDoc(doc(db, 'tickets', t.id)); } setOpenMenuId(null); }} /* ... */ >🗑️ Delete</button>
-                          </div>
-                        )}
-
-                        {/* Claimed Content */}
-                        <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
-                          {t.material} — {t.qty}
-                        </p>
-                        <p style={{ color: '#D1D5DB', marginTop: '0.25rem' }}>{t.projectName}</p>
-                        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
-                          ETA: {t.anticipatedTime || "ASAP"}
-                        </p>
-                      </div>
+                        <div key={t.id} style={{ backgroundColor: '#374151', padding: '1.25rem', borderRadius: '0.75rem' }}>
+                          <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
+                            {t.material} — {t.qty}
+                          </p>
+                          <p style={{ color: '#D1D5DB', marginTop: '0.25rem' }}>{t.projectName}</p>
+                          <p style={{ fontSize: '0.875rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
+                            ETA: {t.anticipatedTime || "ASAP"}
+                          </p>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -624,143 +457,31 @@ useEffect(() => {
                       {csi === "Other" ? "Other Deliveries" : `Division ${csi}`}
                     </h3>
                     <div style={{ display: 'grid', gap: '1rem' }}>
-                    {tickets.map((t) => (
-                      <div 
-                        key={t.id} 
-                        style={{ 
-                          backgroundColor: '#374151', 
-                          padding: '1.25rem', 
-                          borderRadius: '0.75rem', 
-                          position: 'relative'  // Important: needed for absolute menu positioning
-                        }}
-                      >
-                        {/* 3 Dots Menu Button */}
-                        <button
-                          onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                          style={{ 
-                            position: 'absolute', 
-                            top: '0.5rem', 
-                            right: '0.5rem', 
-                            background: 'none', 
-                            border: 'none', 
-                            color: '#9CA3AF', 
-                            fontSize: '1.5rem', 
-                            cursor: 'pointer',
-                            padding: '0.25rem',
-                            borderRadius: '0.25rem',
-                            lineHeight: '1'
-                          }}
-                          aria-label="Ticket options"
-                        >
-                          ⋮
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {openMenuId === t.id && (
-                          <div 
-                            className="menu-dropdown" 
-                            style={{ 
-                              position: 'absolute', 
-                              top: '2.5rem', 
-                              right: '0.5rem', 
-                              backgroundColor: '#1F2937', 
-                              borderRadius: '0.5rem', 
-                              boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
-                              zIndex: 50,
-                              minWidth: '140px',
-                              border: '1px solid #4B5563'
+                      {tickets.map((t) => (
+                        <div key={t.id} style={{ backgroundColor: '#374151', padding: '1.25rem', borderRadius: '0.75rem' }}>
+                          <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
+                            {t.material} — {t.qty}
+                          </p>
+                          <p style={{ color: '#D1D5DB', marginTop: '0.25rem' }}>{t.projectName}</p>
+                          <p style={{ fontSize: '0.875rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
+                            ETA: {t.anticipatedTime || "ASAP"}
+                          </p>
+                          <button
+                            onClick={async () => {
+                              const url = `${window.location.origin}/driver?ticketId=${t.shortId || t.id}`;
+                              try {
+                                await navigator.clipboard.writeText(url);
+                                alert("Link copied!");
+                              } catch {
+                                prompt("Copy link:", url);
+                              }
                             }}
+                            style={{ marginTop: '1rem', width: '100%', backgroundColor: '#CA8A04', color: 'white', padding: '0.5rem', borderRadius: '0.5rem', fontWeight: 'medium' }}
                           >
-                            <button
-                              onClick={() => {
-                                alert('Edit ticket — coming soon! 🚧');
-                                setOpenMenuId(null);
-                              }}
-                              style={{ 
-                                display: 'block', 
-                                width: '100%', 
-                                padding: '0.75rem 1rem', 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#E5E7EB', 
-                                textAlign: 'left', 
-                                cursor: 'pointer',
-                                fontSize: '0.95rem'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                              ✏️ Edit
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (confirm('Permanently delete this ticket? This cannot be undone.')) {
-                                  try {
-                                    await deleteDoc(doc(db, 'tickets', t.id));
-                                    alert('Ticket deleted successfully');
-                                  } catch (err) {
-                                    console.error('Delete failed:', err);
-                                    alert('Failed to delete ticket');
-                                  }
-                                }
-                                setOpenMenuId(null);
-                              }}
-                              style={{ 
-                                display: 'block', 
-                                width: '100%', 
-                                padding: '0.75rem 1rem', 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#EF4444', 
-                                textAlign: 'left', 
-                                cursor: 'pointer',
-                                fontSize: '0.95rem',
-                                fontWeight: '500'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#7F1D1D'}
-                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Ticket Content */}
-                        <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308', margin: '0 0 0.5rem 0' }}>
-                          {t.material} — {t.qty}
-                        </p>
-                        <p style={{ color: '#D1D5DB', margin: '0.25rem 0' }}>{t.projectName}</p>
-                        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: '0.5rem 0' }}>
-                          ETA: {t.anticipatedTime || "ASAP"}
-                        </p>
-
-                        {/* Copy Driver Link Button */}
-                        <button
-                          onClick={async () => {
-                            const url = `${window.location.origin}/driver?ticketId=${t.shortId || t.id}`;
-                            try {
-                              await navigator.clipboard.writeText(url);
-                              alert("Link copied!");
-                            } catch {
-                              prompt("Copy link:", url);
-                            }
-                          }}
-                          style={{ 
-                            marginTop: '1rem', 
-                            width: '100%', 
-                            backgroundColor: '#CA8A04', 
-                            color: 'white', 
-                            padding: '0.5rem', 
-                            borderRadius: '0.5rem', 
-                            fontWeight: 'medium',
-                            border: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Copy Driver Link
-                        </button>
-                      </div>
-                    ))}
+                            Copy Driver Link
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))

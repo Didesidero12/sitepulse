@@ -10,6 +10,7 @@ import { Source, Layer } from 'react-map-gl/mapbox';
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, getDocs, query, where, collection } from 'firebase/firestore';
+import { deleteField } from 'firebase/firestore';
 
 import type { DirectionsResponse } from '@mapbox/mapbox-sdk/services/directions';
 import type { Map as MapboxMap } from 'mapbox-gl';
@@ -29,6 +30,7 @@ export default function DriverContent() {
   const [bearingMode, setBearingMode] = useState<'north' | 'heading' | '3d'>('3d');
   const [hasFirstFix, setHasFirstFix] = useState(false);
   const [mapIsOffCenter, setMapIsOffCenter] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [destination, setDestination] = useState<{ lat: number; lng: number }>({
     lat: 46.21667,
     lng: -119.22323,
@@ -154,6 +156,10 @@ const formatDuration = (minutes: number | null) => {
     );
     return dist < 75;  // ~75 meters = arrived
   };
+
+  useEffect(() => {
+  setIsMounted(true);
+}, []);
 
 useEffect(() => {
   if (!tracking) return;
@@ -467,13 +473,34 @@ useEffect(() => {
 
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
+    // Primary snap
     requestAnimationFrame(() => {
-      sheetRef.current.snapTo(1); // Peek
+      sheetRef.current.snapTo(0);
     });
+
+    // Fallback in case animation hasn't settled
+    setTimeout(() => {
+      if (tracking && sheetRef.current) {
+        sheetRef.current.snapTo(0);
+      }
+    }, 300);
   }
 }, [tracking]);
 
-const handleStop = () => {
+const handleStop = async () => {
+  if (ticket?.id) {
+    try {
+      await updateDoc(doc(db, 'tickets', ticket.id), {
+        driverLocation: deleteField(),
+        status: 'claimed-untracking',  // ← THIS IS KEY
+      });
+      console.log("Driver stopped — back to Claimed tab");
+    } catch (err) {
+      console.warn("Failed to update status on stop:", err);
+    }
+  }
+
+  // 2. Your existing cleanup — keep everything you already had
   setTracking(false);
   setCurrentPos(null);
   setSmoothedPos(null);
@@ -488,10 +515,11 @@ const handleStop = () => {
   setShowArrivalConfirm(false);
   setNotified30Min(false);
   setNotified5Min(false);
+  setHasFirstFix(false);
 
-  // UNLOCK MAP
+  // 3. Unlock map
   if (mapRef.current) {
-    const map = mapRef.current;
+    const map = mapRef.current.getMap();
     if (map) {
       map.dragPan.enable();
       map.scrollZoom.enable();
@@ -500,8 +528,12 @@ const handleStop = () => {
       map.keyboard.enable();
     }
   }
-  setHasFirstFix(false);
+
+  // 4. Drop the sheet so you can see any errors
+  sheetRef.current?.snapTo(1);
 };
+
+
 
 return (
   <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
@@ -669,18 +701,19 @@ initialViewState={{
   </div>
 )}
 
-    {/* Bottom Sheet */}
-    <Sheet
-    ref={sheetRef}
-    isOpen={true}
-    onClose={() => {}}
-    snapPoints={[0, 0.2, 0.6, 1]}  // Fixed: ascending with 0 and 1
-    initialSnap={2}  // → now starts at 0.6 (60%) → perfect height
-    onSnap={(index) => setSheetSnap(index)}
-    disableDismiss={true}
-    disableDrag={false}
+{/* Bottom Sheet - Only render after mount to avoid hydration mismatch */}
+    {isMounted ? (
+      <Sheet
+      ref={sheetRef}
+      isOpen={true}
+      onClose={() => {}}
+      snapPoints={[0, 0.5, 1]}           // 0 = peek, 0.5 = half, 1 = full
+      initialSnap={1}                    // ← CHANGE TO 1 → starts at half-mast (0.5)
+      onSnap={(index) => setSheetSnap(index)}
+      disableDismiss={true}
+      disableDrag={false}
     >
-  <Sheet.Container>
+      <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
 
     <Sheet.Content>
@@ -843,31 +876,69 @@ initialViewState={{
           {/* RIGHT: CLAIM/UNCLAIM + START — TIGHT AND BEAUTIFUL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
             <button
-              onClick={() => {
-                if (claimed) {
-                  if (confirm('Unclaim this delivery?')) setClaimed(false);
-                } else {
-                  setClaimed(true);
+            onClick={async () => {
+              if (claimed) {
+                // UNCLAIM
+                if (confirm('Unclaim this delivery?')) {
+                  try {
+                    if (ticket?.id) {
+                      // Auto-stop tracking if active + clear location + reset to unclaimed
+                      await updateDoc(doc(db, 'tickets', ticket.id), {
+                        status: 'unclaimed',
+                        driverLocation: deleteField(),
+                        driverId: deleteField(), // optional, if you store it
+                      });
+                    }
+                    setClaimed(false);
+                    setTracking(false); // force stop tracking
+                  } catch (err) {
+                    console.error('Unclaim failed:', err);
+                    alert('Failed to unclaim');
+                  }
                 }
-              }}
-              style={{
-                padding: '14px 32px',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: 'white',
-                background: claimed ? '#dc2626' : '#3b82f6',
-                border: 'none',
-                borderRadius: '30px',
-                minWidth: '220px',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
-              }}
+              } else {
+                // CLAIM
+                try {
+                  if (ticket?.id) {
+                    await updateDoc(doc(db, 'tickets', ticket.id), {
+                      status: 'claimed-untracking',
+                      driverId: 'temp-driver-id', // replace with real if you have auth
+                    });
+                  }
+                  setClaimed(true);
+                } catch (err) {
+                  console.error('Claim failed:', err);
+                  alert('Failed to claim');
+                }
+              }
+            }}
             >
               {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
             </button>
 
             {claimed && !tracking && (
               <button
-                onClick={() => setTracking(true)}
+                onClick={async () => {
+                  if (!ticket?.id) {
+                    alert('Ticket not loaded yet — try again in a second');
+                    return;
+                  }
+
+                  try {
+                    // Update Firestore status so War Room moves it to Live tab
+                    await updateDoc(doc(db, 'tickets', ticket.id), {
+                      status: 'claimed-tracking',
+                    });
+                    console.log('Status updated to claimed-tracking');
+                  } catch (err) {
+                    console.error('Failed to update status:', err);
+                    alert('Failed to start tracking — check connection');
+                    return; // don't start local tracking if Firestore fails
+                  }
+
+                  // Only after successful Firestore write, start local tracking
+                  setTracking(true);
+                }}
                 style={{
                   padding: '16px 40px',
                   fontSize: '20px',
@@ -902,10 +973,21 @@ initialViewState={{
           </div>
         )}
       </div>
-    </Sheet.Content>
-  </Sheet.Container>
-  <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />
-</Sheet>
+</Sheet.Content>
+        </Sheet.Container>
+        <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />  {/* optional: tap backdrop to reopen half */}
+      </Sheet>
+    ) : (
+      // Placeholder during SSR — prevents layout shift and hydration error
+      <div style={{ 
+        height: '50vh', 
+        backgroundColor: '#f3f4f6',
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+      }} />
+    )}
   
       {/* Global Style for Touch Pass-Through */}
       <style jsx global>{`
