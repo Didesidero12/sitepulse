@@ -59,6 +59,11 @@ export default function DriverContent() {
   const animationRef = useRef<number>();
   const lastUpdateTime = useRef<number>(0);
   const lastLocationWrite = useRef<number>(0);  // ← ADD THIS LINE
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<'Van' | 'Box Truck' | 'Flatbed' | '18-Wheeler'>('Van');
+  const [canMakeTime, setCanMakeTime] = useState<boolean | null>(null);
+  const [alternativeTime, setAlternativeTime] = useState('');
+  
 
   // Refs
   const sheetRef = useRef<any>(null);  // sheet doesn't have types — fine to leave as any
@@ -718,92 +723,143 @@ initialViewState={{
       <Sheet.Container>
     {/* REMOVE <Sheet.Header /> completely — no extra line */}
 
-    <Sheet.Content>
-        {/* TICKET SUMMARY — FINAL, PERFECT FLOW */}
-        <div style={{ padding: '12px', paddingTop: 8 }}>
-          {/* Drag Handle */}
-          <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
-            <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
+<Sheet.Content>
+  <div style={{ padding: '12px', paddingTop: 8 }}>
+    {/* Drag Handle */}
+    <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+      <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
+    </div>
+
+    {/* PRE-CLAIM QUESTIONS — only show if not claimed */}
+    {!claimed && ticket && (
+      <div style={{
+        background: '#1e293b',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '20px',
+        border: '1px solid #334155'
+      }}>
+        <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#FBBF24' }}>
+          Confirm Your Delivery
+        </h3>
+
+        {/* Vehicle Type */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+            Vehicle Type
+          </label>
+          <select
+            value={selectedVehicle}
+            onChange={(e) => setSelectedVehicle(e.target.value as any)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              backgroundColor: '#334155',
+              color: 'white',
+              border: 'none'
+            }}
+          >
+            <option>Van</option>
+            <option>Box Truck</option>
+            <option>Flatbed</option>
+            <option>18-Wheeler</option>
+          </select>
+        </div>
+
+        {/* ETA Question */}
+        <p style={{ marginBottom: '1rem', fontWeight: '600' }}>
+          Requested arrival: <span style={{ color: '#FBBF24' }}>{ticket.anticipatedTime || "ASAP"}</span>
+        </p>
+        <p style={{ marginBottom: '1rem' }}>Can you arrive by then?</p>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+          <button
+            onClick={() => setCanMakeTime('yes')}
+            style={{
+              flex: 1,
+              padding: '1rem',
+              borderRadius: '0.5rem',
+              backgroundColor: canMakeTime === 'yes' ? '#16A34A' : '#334155',
+              color: 'white',
+              fontWeight: 'bold'
+            }}
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => setCanMakeTime('no')}
+            style={{
+              flex: 1,
+              padding: '1rem',
+              borderRadius: '0.5rem',
+              backgroundColor: canMakeTime === 'no' ? '#DC2626' : '#334155',
+              color: 'white',
+              fontWeight: 'bold'
+            }}
+          >
+            No
+          </button>
+        </div>
+
+        {canMakeTime === 'no' && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+              Your proposed time
+            </label>
+            <input
+              type="text"
+              value={alternativeTime}
+              onChange={(e) => setAlternativeTime(e.target.value)}
+              placeholder="e.g. 2:00 PM"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: '#334155',
+                color: 'white',
+                border: 'none'
+              }}
+            />
           </div>
+        )}
 
-          {/* PRE-START ETA ROW WITH START BUTTON */}
-          {!tracking && (
-            <div style={{
-              background: '#f3f4f6',
-              borderRadius: '12px',
-              padding: '16px',
-              marginBottom: '16px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '0' }}>
-                    {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
-                  </p>
-                  <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0' }}>
-                    {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
-                  </p>
-                </div>
-                {claimed && (
-                  <button
-                    onClick={() => setTracking(true)}
-                    style={{
-                      padding: '12px 28px',
-                      fontSize: '18px',
-                      fontWeight: 'bold',
-                      color: 'white',
-                      background: '#16a34a',
-                      border: 'none',
-                      borderRadius: '30px',
-                      boxShadow: '0 6px 20px rgba(22,163,74,0.4)',
-                    }}
-                  >
-                    Start
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+        <button
+          onClick={async () => {
+            if (!ticket?.id) return;
 
-          {/* LIVE ETA + STOP */}
-          {tracking && (
-            <div style={{
-              background: '#ecfdf5',
-              borderRadius: '16px',
-              padding: '20px',
-              border: '2px solid #86efac',
-              marginBottom: '16px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <p style={{ fontSize: '36px', fontWeight: 'bold', margin: '0' }}>
-                    {etaMinutes !== null ? formatDuration(etaMinutes) : '-- min'}
-                  </p>
-                  <p style={{ fontSize: '16px', color: '#666', margin: '6px 0 0' }}>
-                    {distanceMiles !== null ? `${distanceMiles} mi • ${arrivalTime}` : '-- mi • --:-- AM'}
-                  </p>
-                  {nextInstruction && (
-                    <p style={{ fontSize: '17px', color: '#333', margin: '12px 0 0', fontWeight: '600' }}>
-                      ➤ {nextInstruction}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={handleStop}
-                  style={{
-                    padding: '16px 36px',
-                    fontSize: '20px',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    background: '#dc2626',
-                    border: 'none',
-                    borderRadius: '30px',
-                  }}
-                >
-                  Stop
-                </button>
-              </div>
-            </div>
-          )}
+            const finalTime = canMakeTime === 'no' ? alternativeTime : ticket.anticipatedTime;
+
+            try {
+              await updateDoc(doc(db, 'tickets', ticket.id), {
+                status: 'claimed-untracking',
+                vehicleType: selectedVehicle,
+                anticipatedTime: finalTime || ticket.anticipatedTime,
+              });
+              setClaimed(true);
+              // Reset form
+              setCanMakeTime(null);
+              setAlternativeTime('');
+              setSelectedVehicle('Van');
+            } catch (err) {
+              console.error(err);
+              alert('Failed to claim');
+            }
+          }}
+          disabled={canMakeTime === null || (canMakeTime === 'no' && !alternativeTime)}
+          style={{
+            width: '100%',
+            padding: '1rem',
+            backgroundColor: '#16A34A',
+            color: 'white',
+            borderRadius: '0.5rem',
+            fontWeight: 'bold',
+            opacity: (canMakeTime === null || (canMakeTime === 'no' && !alternativeTime)) ? 0.5 : 1
+          }}
+        >
+          Confirm & Claim Delivery
+        </button>
+      </div>
+    )}
 
         {/* TICKET SUMMARY + BUTTONS — FINAL, PERFECT, BUTTONS ON RIGHT */}
         <div style={{
@@ -880,38 +936,26 @@ initialViewState={{
             <button
             onClick={async () => {
               if (claimed) {
-                // UNCLAIM
+                // UNCLAIM — keep your existing perfect logic
                 if (confirm('Unclaim this delivery?')) {
                   try {
                     if (ticket?.id) {
-                      // Auto-stop tracking if active + clear location + reset to unclaimed
                       await updateDoc(doc(db, 'tickets', ticket.id), {
                         status: 'unclaimed',
                         driverLocation: deleteField(),
-                        driverId: deleteField(), // optional, if you store it
+                        driverId: deleteField(),
                       });
                     }
                     setClaimed(false);
-                    setTracking(false); // force stop tracking
+                    setTracking(false);
                   } catch (err) {
                     console.error('Unclaim failed:', err);
                     alert('Failed to unclaim');
                   }
                 }
               } else {
-                // CLAIM
-                try {
-                  if (ticket?.id) {
-                    await updateDoc(doc(db, 'tickets', ticket.id), {
-                      status: 'claimed-untracking',
-                      driverId: 'temp-driver-id', // replace with real if you have auth
-                    });
-                  }
-                  setClaimed(true);
-                } catch (err) {
-                  console.error('Claim failed:', err);
-                  alert('Failed to claim');
-                }
+                // CLAIM — instead of immediate claim, show modal
+                setShowClaimModal(true);
               }
             }}
             >

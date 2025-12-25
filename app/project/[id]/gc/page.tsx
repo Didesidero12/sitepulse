@@ -548,7 +548,24 @@ useEffect(() => {
     >
       {/* 3-dots */}
 
-      <p style={{ fontWeight: 'bold' }}>{t.material} — {t.qty}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+  {/* Vehicle Icon */}
+  {t.vehicleType ? (
+    <span style={{ fontSize: '1.75rem' }}>
+      {t.vehicleType === 'Van' && '🚐'}
+      {t.vehicleType === 'Box Truck' && '🚚'}
+      {t.vehicleType === 'Flatbed' && '🛻'}
+      {t.vehicleType === '18-Wheeler' && '🚛🚛'}
+    </span>
+  ) : (
+    <span style={{ fontSize: '1.75rem', opacity: 0.4 }}>❓</span>  // unknown
+  )}
+
+  {/* Material + Qty */}
+  <p style={{ fontWeight: 'bold', margin: 0, fontSize: '1.125rem', color: '#EAB308' }}>
+    {t.material} — {t.qty}
+  </p>
+</div>
 
       <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
         Agreed: <span style={{ fontWeight: 'bold' }}>{t.anticipatedTime || "ASAP"}</span>
@@ -603,10 +620,24 @@ useEffect(() => {
                         >
                           {/* Your 3-dots menu here */}
 
-                          <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
-                            {t.material} — {t.qty}
-                          </p>
-                          <p style={{ color: '#D1D5DB' }}>{t.projectName}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                            {/* Vehicle Icon */}
+                            {t.vehicleType ? (
+                              <span style={{ fontSize: '1.75rem' }}>
+                                {t.vehicleType === 'Van' && '🚐'}
+                                {t.vehicleType === 'Box Truck' && '🚚'}
+                                {t.vehicleType === 'Flatbed' && '🛻'}
+                                {t.vehicleType === '18-Wheeler' && '🚛🚛'}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '1.75rem', opacity: 0.4 }}>❓</span>  // unknown
+                            )}
+
+                            {/* Material + Qty */}
+                            <p style={{ fontWeight: 'bold', margin: 0, fontSize: '1.125rem', color: '#EAB308' }}>
+                              {t.material} — {t.qty}
+                            </p>
+                          </div>
 
                           {/* Enhanced ETA line */}
                           <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
@@ -659,10 +690,24 @@ useEffect(() => {
                         >
                           {/* Your 3-dots menu here */}
 
-                          <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
-                            {t.material} — {t.qty}
-                          </p>
-                          <p style={{ color: '#D1D5DB' }}>{t.projectName}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                            {/* Vehicle Icon */}
+                            {t.vehicleType ? (
+                              <span style={{ fontSize: '1.75rem' }}>
+                                {t.vehicleType === 'Van' && '🚐'}
+                                {t.vehicleType === 'Box Truck' && '🚚'}
+                                {t.vehicleType === 'Flatbed' && '🛻'}
+                                {t.vehicleType === '18-Wheeler' && '🚛🚛'}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '1.75rem', opacity: 0.4 }}>❓</span>  // unknown
+                            )}
+
+                            {/* Material + Qty */}
+                            <p style={{ fontWeight: 'bold', margin: 0, fontSize: '1.125rem', color: '#EAB308' }}>
+                              {t.material} — {t.qty}
+                            </p>
+                          </div>
 
                           {/* Enhanced ETA line */}
                           <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
