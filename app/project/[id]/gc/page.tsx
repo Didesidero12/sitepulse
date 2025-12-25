@@ -37,6 +37,11 @@ export default function SuperWarRoom() {
   const [activeFilter, setActiveFilter] = useState<'ALL' | string>('ALL');
 const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
+//My adds
+const [showDestModal, setShowDestModal] = useState(false);
+const [changeDestTicket, setChangeDestTicket] = useState<Ticket | null>(null);
+const [newDestCoords, setNewDestCoords] = useState<{ lat: number; lng: number } | null>(null);
+
 // Unique divisions for filter buttons
 const allTickets = [...liveTickets, ...claimedWaitingTickets, ...unclaimedTickets];
 const uniqueCSIDivisions = Array.from(new Set(allTickets.map(t => t.csiDivision || "Other"))).sort();
@@ -532,62 +537,165 @@ useEffect(() => {
   const delayInfo = getDelayInfo(t, currentETA);
 
   return (
-    <div 
-      key={t.id} 
-      onClick={() => zoomToDriver(t)}
-      style={{ 
-        backgroundColor: highlightedId === t.id ? '#4B5563' : '#374151', 
-        padding: '1.25rem', 
-        borderRadius: '0.75rem', 
-        position: 'relative', 
-        marginBottom: '1rem',
-        cursor: 'pointer',
-        border: highlightedId === t.id ? '2px solid #06B6D4' : 'none',
-        transition: 'all 0.2s'
-      }}
-    >
-      {/* 3-dots */}
+              <div 
+                key={t.id} 
+                onClick={() => zoomToDriver(t)}
+                style={{ 
+                  backgroundColor: highlightedId === t.id ? '#4B5563' : '#374151', 
+                  padding: '1.25rem', 
+                  borderRadius: '0.75rem', 
+                  position: 'relative', 
+                  marginBottom: '1rem',
+                  cursor: 'pointer',
+                  border: highlightedId === t.id ? '2px solid #06B6D4' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {/* 3-DOTS MENU - ADD THIS BLOCK */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // prevent zoom on click
+                          setOpenMenuId(openMenuId === t.id ? null : t.id);
+                        }}
+                        style={{ 
+                          position: 'absolute', 
+                          top: '0.5rem', 
+                          right: '0.5rem', 
+                          background: 'none', 
+                          border: 'none', 
+                          color: '#9CA3AF', 
+                          fontSize: '1.5rem', 
+                          cursor: 'pointer',
+                          padding: '0.25rem',
+                          borderRadius: '0.25rem'
+                        }}
+                      >
+                        ⋮
+                      </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-  {/* Vehicle Icon */}
-  {t.vehicleType ? (
-    <span style={{ fontSize: '1.75rem' }}>
-      {t.vehicleType === 'Van' && '🚐'}
-      {t.vehicleType === 'Box Truck' && '🚚'}
-      {t.vehicleType === 'Flatbed' && '🛻'}
-      {t.vehicleType === '18-Wheeler' && '🚛🚛'}
-    </span>
-  ) : (
-    <span style={{ fontSize: '1.75rem', opacity: 0.4 }}>❓</span>  // unknown
-  )}
+                      {openMenuId === t.id && (
+                        <div 
+                          className="menu-dropdown" 
+                          style={{ 
+                            position: 'absolute', 
+                            top: '2.5rem', 
+                            right: '0.5rem', 
+                            backgroundColor: '#1F2937', 
+                            borderRadius: '0.5rem', 
+                            boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
+                            zIndex: 50,
+                            minWidth: '140px',
+                            border: '1px solid #4B5563'
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alert('Edit ticket — coming soon! 🚧');
+                              setOpenMenuId(null);
+                            }}
+                            style={{ 
+                              display: 'block', 
+                              width: '100%', 
+                              padding: '0.75rem 1rem', 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#E5E7EB', 
+                              textAlign: 'left', 
+                              cursor: 'pointer',
+                              fontSize: '0.95rem'
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                          onClick={() => {
+                            setChangeDestTicket(t);
+                            setShowDestModal(true);
+                          }}
+                          style={{ 
+                            display: 'block', 
+                            width: '100%', 
+                            padding: '0.75rem 1rem', 
+                            background: 'none', 
+                            border: 'none', 
+                            color: '#3B82F6', 
+                            textAlign: 'left', 
+                            cursor: 'pointer',
+                            fontSize: '0.95rem'
+                          }}
+                        >
+                          📍 Change Drop Zone
+                        </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Permanently delete this live ticket? Driver will lose tracking.')) {
+                                deleteDoc(doc(db, 'tickets', t.id)).then(() => {
+                                  alert('Ticket deleted');
+                                }).catch(() => alert('Delete failed'));
+                              }
+                              setOpenMenuId(null);
+                            }}
+                            style={{ 
+                              display: 'block', 
+                              width: '100%', 
+                              padding: '0.75rem 1rem', 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#EF4444', 
+                              textAlign: 'left', 
+                              cursor: 'pointer',
+                              fontSize: '0.95rem',
+                              fontWeight: '500'
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      )}
+                      {/* END 3-DOTS MENU */}
 
-  {/* Material + Qty */}
-  <p style={{ fontWeight: 'bold', margin: 0, fontSize: '1.125rem', color: '#EAB308' }}>
-    {t.material} — {t.qty}
-  </p>
-</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  {/* Vehicle Icon */}
+                  {t.vehicleType ? (
+                    <span style={{ fontSize: '1.75rem' }}>
+                      {t.vehicleType === 'Van' && '🚐'}
+                      {t.vehicleType === 'Box Truck' && '🚚'}
+                      {t.vehicleType === 'Flatbed' && '🛻'}
+                      {t.vehicleType === '18-Wheeler' && '🚛🚛'}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '1.75rem', opacity: 0.4 }}>❓</span>  // unknown
+                  )}
 
-      <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
-        Agreed: <span style={{ fontWeight: 'bold' }}>{t.anticipatedTime || "ASAP"}</span>
-        {currentETA && (
-          <>
-            {' → Current: '}
-            <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
-            {delayInfo && (
-              <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
-                ({delayInfo.text})
-              </span>
-            )}
-          </>
-        )}
-      </p>
+                  {/* Material + Qty */}
+                  <p style={{ fontWeight: 'bold', margin: 0, fontSize: '1.125rem', color: '#EAB308' }}>
+                    {t.material} — {t.qty}
+                  </p>
+                </div>
 
-      <button onClick={(e) => { e.stopPropagation(); zoomToDriver(t); }} /* style */>
-        Zoom to Driver
-      </button>
-    </div>
-  );
-})}
+                <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
+                  Agreed: <span style={{ fontWeight: 'bold' }}>{t.anticipatedTime || "ASAP"}</span>
+                  {currentETA && (
+                    <>
+                      {' → Current: '}
+                      <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
+                      {delayInfo && (
+                        <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                          ({delayInfo.text})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </p>
+
+                <button onClick={(e) => { e.stopPropagation(); zoomToDriver(t); }} /* style */>
+                  Zoom to Driver
+                </button>
+              </div>
+            );
+          })}
               </>
             )}
 
@@ -618,7 +726,110 @@ useEffect(() => {
                             marginBottom: '1rem' 
                           }}
                         >
-                          {/* Your 3-dots menu here */}
+                         {/* 3-DOTS MENU - ADD THIS BLOCK */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // prevent zoom on click
+                              setOpenMenuId(openMenuId === t.id ? null : t.id);
+                            }}
+                            style={{ 
+                              position: 'absolute', 
+                              top: '0.5rem', 
+                              right: '0.5rem', 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#9CA3AF', 
+                              fontSize: '1.5rem', 
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              borderRadius: '0.25rem'
+                            }}
+                          >
+                            ⋮
+                          </button>
+
+                          {openMenuId === t.id && (
+                            <div 
+                              className="menu-dropdown" 
+                              style={{ 
+                                position: 'absolute', 
+                                top: '2.5rem', 
+                                right: '0.5rem', 
+                                backgroundColor: '#1F2937', 
+                                borderRadius: '0.5rem', 
+                                boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
+                                zIndex: 50,
+                                minWidth: '140px',
+                                border: '1px solid #4B5563'
+                              }}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  alert('Edit ticket — coming soon! 🚧');
+                                  setOpenMenuId(null);
+                                }}
+                                style={{ 
+                                  display: 'block', 
+                                  width: '100%', 
+                                  padding: '0.75rem 1rem', 
+                                  background: 'none', 
+                                  border: 'none', 
+                                  color: '#E5E7EB', 
+                                  textAlign: 'left', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.95rem'
+                                }}
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                              onClick={() => {
+                                setChangeDestTicket(t);
+                                setShowDestModal(true);
+                              }}
+                              style={{ 
+                                display: 'block', 
+                                width: '100%', 
+                                padding: '0.75rem 1rem', 
+                                background: 'none', 
+                                border: 'none', 
+                                color: '#3B82F6', 
+                                textAlign: 'left', 
+                                cursor: 'pointer',
+                                fontSize: '0.95rem'
+                              }}
+                            >
+                              📍 Change Drop Zone
+                            </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Permanently delete this live ticket? Driver will lose tracking.')) {
+                                    deleteDoc(doc(db, 'tickets', t.id)).then(() => {
+                                      alert('Ticket deleted');
+                                    }).catch(() => alert('Delete failed'));
+                                  }
+                                  setOpenMenuId(null);
+                                }}
+                                style={{ 
+                                  display: 'block', 
+                                  width: '100%', 
+                                  padding: '0.75rem 1rem', 
+                                  background: 'none', 
+                                  border: 'none', 
+                                  color: '#EF4444', 
+                                  textAlign: 'left', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.95rem',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
+                          )}
+                          {/* END 3-DOTS MENU */}
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                             {/* Vehicle Icon */}
@@ -688,7 +899,110 @@ useEffect(() => {
                             marginBottom: '1rem' 
                           }}
                         >
-                          {/* Your 3-dots menu here */}
+                          {/* 3-DOTS MENU - ADD THIS BLOCK */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation(); // prevent zoom on click
+                                setOpenMenuId(openMenuId === t.id ? null : t.id);
+                              }}
+                              style={{ 
+                                position: 'absolute', 
+                                top: '0.5rem', 
+                                right: '0.5rem', 
+                                background: 'none', 
+                                border: 'none', 
+                                color: '#9CA3AF', 
+                                fontSize: '1.5rem', 
+                                cursor: 'pointer',
+                                padding: '0.25rem',
+                                borderRadius: '0.25rem'
+                              }}
+                            >
+                              ⋮
+                            </button>
+
+                            {openMenuId === t.id && (
+                              <div 
+                                className="menu-dropdown" 
+                                style={{ 
+                                  position: 'absolute', 
+                                  top: '2.5rem', 
+                                  right: '0.5rem', 
+                                  backgroundColor: '#1F2937', 
+                                  borderRadius: '0.5rem', 
+                                  boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
+                                  zIndex: 50,
+                                  minWidth: '140px',
+                                  border: '1px solid #4B5563'
+                                }}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    alert('Edit ticket — coming soon! 🚧');
+                                    setOpenMenuId(null);
+                                  }}
+                                  style={{ 
+                                    display: 'block', 
+                                    width: '100%', 
+                                    padding: '0.75rem 1rem', 
+                                    background: 'none', 
+                                    border: 'none', 
+                                    color: '#E5E7EB', 
+                                    textAlign: 'left', 
+                                    cursor: 'pointer',
+                                    fontSize: '0.95rem'
+                                  }}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                onClick={() => {
+                                  setChangeDestTicket(t);
+                                  setShowDestModal(true);
+                                }}
+                                style={{ 
+                                  display: 'block', 
+                                  width: '100%', 
+                                  padding: '0.75rem 1rem', 
+                                  background: 'none', 
+                                  border: 'none', 
+                                  color: '#3B82F6', 
+                                  textAlign: 'left', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.95rem'
+                                }}
+                              >
+                                📍 Change Drop Zone
+                              </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Permanently delete this live ticket? Driver will lose tracking.')) {
+                                      deleteDoc(doc(db, 'tickets', t.id)).then(() => {
+                                        alert('Ticket deleted');
+                                      }).catch(() => alert('Delete failed'));
+                                    }
+                                    setOpenMenuId(null);
+                                  }}
+                                  style={{ 
+                                    display: 'block', 
+                                    width: '100%', 
+                                    padding: '0.75rem 1rem', 
+                                    background: 'none', 
+                                    border: 'none', 
+                                    color: '#EF4444', 
+                                    textAlign: 'left', 
+                                    cursor: 'pointer',
+                                    fontSize: '0.95rem',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  🗑️ Delete
+                                </button>
+                              </div>
+                            )}
+                            {/* END 3-DOTS MENU */}
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                             {/* Vehicle Icon */}
@@ -796,6 +1110,95 @@ useEffect(() => {
           </button>
         </div>
       </div>
+      {/* CHANGE DROP ZONE MODAL */}
+      {showDestModal && changeDestTicket && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }} onClick={() => setShowDestModal(false)}>
+          <div 
+            style={{
+              backgroundColor: '#1F2937',
+              padding: '2rem',
+              borderRadius: '1rem',
+              width: '90%',
+              maxWidth: '500px',
+              color: 'white',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()} // prevent close when clicking inside
+          >
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', textAlign: 'center' }}>
+              Change Drop Zone
+            </h2>
+            <p style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+              Ticket: <strong>{changeDestTicket.material} — {changeDestTicket.qty}</strong>
+            </p>
+
+            {/* Map Picker - Placeholder for now */}
+            <div style={{
+              height: '350px',
+              backgroundColor: '#334155',
+              borderRadius: '0.75rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.2rem',
+              color: '#9CA3AF'
+            }}>
+              Map Picker Coming Soon<br />
+              (Click to select new location)
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={() => {
+                  setShowDestModal(false);
+                  setChangeDestTicket(null);
+                  setNewDestCoords(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '1rem',
+                  backgroundColor: '#4B5563',
+                  color: 'white',
+                  borderRadius: '0.5rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  // Placeholder action — real update next
+                  alert('Drop zone changed! Driver will be notified.');
+                  setShowDestModal(false);
+                  setChangeDestTicket(null);
+                  setNewDestCoords(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '1rem',
+                  backgroundColor: '#3B82F6',
+                  color: 'white',
+                  borderRadius: '0.5rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                Confirm New Location
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

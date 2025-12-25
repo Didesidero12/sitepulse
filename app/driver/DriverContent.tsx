@@ -63,6 +63,9 @@ export default function DriverContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<'Van' | 'Box Truck' | 'Flatbed' | '18-Wheeler'>('Van');
   const [canMakeTime, setCanMakeTime] = useState<'yes' | 'no' | null>(null);  // ← Fixed type
   const [alternativeTime, setAlternativeTime] = useState('');
+  const [showDestModal, setShowDestModal] = useState(false);
+  const [changeDestTicket, setChangeDestTicket] = useState<Ticket | null>(null);
+  const [newDestCoords, setNewDestCoords] = useState<{ lat: number; lng: number } | null>(null);
   
 
   // Refs
@@ -730,7 +733,7 @@ initialViewState={{
       <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
     </div>
 
-    {/* PRE-CLAIM QUESTIONS — only show if not claimed */}
+{/* CLAIM QUESTIONS — shown only when not claimed */}
     {!claimed && ticket && (
       <div style={{
         background: '#1e293b',
@@ -823,6 +826,7 @@ initialViewState={{
           </div>
         )}
 
+        {/* Confirm Button */}
         <button
           onClick={async () => {
             if (!ticket?.id) return;
@@ -934,30 +938,28 @@ initialViewState={{
           {/* RIGHT: CLAIM/UNCLAIM + START — TIGHT AND BEAUTIFUL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
             <button
-            onClick={async () => {
-              if (claimed) {
-                // UNCLAIM — keep your existing perfect logic
-                if (confirm('Unclaim this delivery?')) {
-                  try {
-                    if (ticket?.id) {
-                      await updateDoc(doc(db, 'tickets', ticket.id), {
-                        status: 'unclaimed',
-                        driverLocation: deleteField(),
-                        driverId: deleteField(),
-                      });
+              onClick={async () => {
+                if (claimed) {
+                  if (confirm('Unclaim this delivery?')) {
+                    try {
+                      if (ticket?.id) {
+                        await updateDoc(doc(db, 'tickets', ticket.id), {
+                          status: 'unclaimed',
+                          driverLocation: deleteField(),
+                          driverId: deleteField(),
+                        });
+                      }
+                      setClaimed(false);
+                      setTracking(false);
+                    } catch (err) {
+                      console.error('Unclaim failed:', err);
+                      alert('Failed to unclaim');
                     }
-                    setClaimed(false);
-                    setTracking(false);
-                  } catch (err) {
-                    console.error('Unclaim failed:', err);
-                    alert('Failed to unclaim');
                   }
+                } else {
+                  setShowClaimModal(true); // opens questions
                 }
-              } else {
-                // CLAIM — instead of immediate claim, show modal
-                setShowClaimModal(true);
-              }
-            }}
+              }}
             >
               {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
             </button>
