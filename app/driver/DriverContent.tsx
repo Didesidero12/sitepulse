@@ -61,7 +61,7 @@ export default function DriverContent() {
   const lastLocationWrite = useRef<number>(0);  // ← ADD THIS LINE
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<'Van' | 'Box Truck' | 'Flatbed' | '18-Wheeler'>('Van');
-  const [canMakeTime, setCanMakeTime] = useState<boolean | null>(null);
+  const [canMakeTime, setCanMakeTime] = useState<'yes' | 'no' | null>(null);  // ← Fixed type
   const [alternativeTime, setAlternativeTime] = useState('');
   
 
