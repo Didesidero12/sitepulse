@@ -246,6 +246,8 @@ const watchId = navigator.geolocation.watchPosition(
   },
   (err) => {
     console.error('GPS Error:', err);
+    console.log('Error Code:', err.code);  // ← ADD THIS
+    console.log('Error Message:', err.message);  // ← ADD THIS
     alert('Location access denied or unavailable');
     setTracking(false);
   },

@@ -34,6 +34,79 @@ export default function SuperWarRoom() {
   const [siteLocation, setSiteLocation] = useState({ lat: 46.21667, lng: -119.22323 });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'ALL' | string>('ALL');
+const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+// Unique divisions for filter buttons
+const allTickets = [...liveTickets, ...claimedWaitingTickets, ...unclaimedTickets];
+const uniqueCSIDivisions = Array.from(new Set(allTickets.map(t => t.csiDivision || "Other"))).sort();
+
+// Filtered ticket lists
+const filteredLive = activeFilter === 'ALL' 
+  ? liveTickets 
+  : liveTickets.filter(t => (t.csiDivision || "Other") === activeFilter);
+
+const filteredClaimed = activeFilter === 'ALL' 
+  ? claimedWaitingTickets 
+  : claimedWaitingTickets.filter(t => (t.csiDivision || "Other") === activeFilter);
+
+const filteredUnclaimed = activeFilter === 'ALL' 
+  ? unclaimedTickets 
+  : unclaimedTickets.filter(t => (t.csiDivision || "Other") === activeFilter);
+
+// Calculate current ETA based on driver location and average speed
+const calculateCurrentETA = (ticket: Ticket): string | null => {
+  if (!ticket.driverLocation || !siteLocation.lat || !siteLocation.lng) return null;
+
+  const distanceMiles = turf.distance(
+    [ticket.driverLocation.lng, ticket.driverLocation.lat],
+    [siteLocation.lng, siteLocation.lat],
+    { units: 'miles' }
+  );
+
+  // Assume average urban speed of 30 mph (conservative for construction areas)
+  const timeMinutes = Math.round((distanceMiles / 30) * 60);
+
+  const arrival = new Date();
+  arrival.setMinutes(arrival.getMinutes() + timeMinutes);
+
+  return arrival.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    hour12: true 
+  });
+};
+
+// Calculate delay in minutes
+const getDelayInfo = (ticket: Ticket, currentETA: string | null) => {
+  if (!ticket.anticipatedTime || !currentETA) return null;
+
+  // Parse anticipated time (assumes format like "10:30 AM")
+  const [time, period] = ticket.anticipatedTime.split(' ');
+  let [hours, minutes] = time.split(':').map(Number);
+  if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+  if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+
+  const anticipatedDate = new Date();
+  anticipatedDate.setHours(hours, minutes, 0, 0);
+
+  // Parse current ETA
+  const currentDate = new Date();
+  const [currentTime, currentPeriod] = currentETA.split(' ');
+  let [currentHours, currentMinutes] = currentTime.split(':').map(Number);
+  if (currentPeriod.toUpperCase() === 'PM' && currentHours !== 12) currentHours += 12;
+  if (currentPeriod.toUpperCase() === 'AM' && currentHours === 12) currentHours = 0;
+  currentDate.setHours(currentHours, currentMinutes, 0, 0);
+
+  const diffMinutes = Math.round((currentDate.getTime() - anticipatedDate.getTime()) / 60000);
+
+  return {
+    minutes: diffMinutes,
+    text: diffMinutes > 0 ? `${diffMinutes} min behind` : 
+          diffMinutes < 0 ? `${Math.abs(diffMinutes)} min early` : 'on time',
+    color: diffMinutes > 15 ? '#EF4444' : diffMinutes > 0 ? '#FBBF24' : '#22C55E'
+  };
+};
 
   // RESOLVE PROJECT ID
   useEffect(() => {
@@ -337,13 +410,15 @@ useEffect(() => {
   };
 
   const zoomToDriver = (ticket: Ticket) => {
-    if (!map.current || !ticket.driverLocation) return;
-
-    map.current.flyTo({
-      center: [ticket.driverLocation.lng, ticket.driverLocation.lat],
-      zoom: 17,
-      duration: 1500,
-    });
+    setHighlightedId(ticket.id);
+    if (map.current && ticket.driverLocation) {
+      map.current.flyTo({
+        center: [ticket.driverLocation.lng, ticket.driverLocation.lat],
+        zoom: 17,
+        duration: 1500,
+      });
+    }
+    setTimeout(() => setHighlightedId(null), 4000);
   };
 
   // HELPER: Group by CSI (for Unclaimed/Claimed)
@@ -394,27 +469,47 @@ useEffect(() => {
       {/* Main Content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left Pane: Tabs & Tickets */}
-        <div style={{ flex: 1, backgroundColor: '#1F2937', padding: '1rem', overflowY: 'auto', color: 'white' }}>
-          {/* Tabs */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', fontSize: '1.25rem' }}>
-            <button
-              onClick={() => setActiveTab("live")}
-              style={{ paddingBottom: '0.5rem', borderBottom: activeTab === "live" ? '4px solid #06B6D4' : '4px solid transparent', color: activeTab === "live" ? '#06B6D4' : '#9CA3AF' }}
-            >
-              LIVE ({liveTickets.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("claimed")}
-              style={{ paddingBottom: '0.5rem', borderBottom: activeTab === "claimed" ? '4px solid #3B82F6' : '4px solid transparent', color: activeTab === "claimed" ? '#3B82F6' : '#9CA3AF' }}
-            >
-              CLAIMED ({claimedWaitingTickets.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("unclaimed")}
-              style={{ paddingBottom: '0.5rem', borderBottom: activeTab === "unclaimed" ? '4px solid #EAB308' : '4px solid transparent', color: activeTab === "unclaimed" ? '#EAB308' : '#9CA3AF' }}
-            >
-              UNCLAIMED ({unclaimedTickets.length})
-            </button>
+        {/* Left Pane: Rolling List with Filters */}
+        <div style={{ flex: 1, backgroundColor: '#1F2937', padding: '1rem', overflowY: 'auto', color: 'white', display: 'flex', flexDirection: 'column' }}>
+          {/* CSI Filter Carousel */}
+          <div style={{ marginBottom: '1.5rem', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '0.5rem' }}>
+            <div style={{ display: 'inline-flex', gap: '0.75rem', alignItems: 'center' }}>
+              {uniqueCSIDivisions.map((division) => (
+                <button
+                  key={division}
+                  onClick={() => setActiveFilter(division)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: activeFilter === division ? '#3B82F6' : '#4B5563',
+                    color: 'white',
+                    borderRadius: '9999px',
+                    border: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: activeFilter === division ? 'bold' : 'normal',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {division === "Other" ? "Other" : `Div ${division}`}
+                </button>
+              ))}
+              <button
+                onClick={() => setActiveFilter('ALL')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: activeFilter === 'ALL' ? '#16A34A' : '#374151',
+                  color: 'white',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                  minWidth: '120px'
+                }}
+              >
+                ALL DELIVERIES
+              </button>
+            </div>
           </div>
 
           {/* Alerts */}
@@ -424,349 +519,206 @@ useEffect(() => {
             </div>
           ))}
 
-          {/* Tab Content */}
-          {activeTab === "live" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {liveTickets.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '1.25rem' }}>No live deliveries</p>
-              ) : (
-                liveTickets.map((t) => (
-                <div 
-                  key={t.id} 
-                  style={{ 
-                    backgroundColor: '#374151', 
-                    padding: '1.25rem', 
-                    borderRadius: '0.75rem', 
-                    position: 'relative'
-                  }}
-                >
-                  {/* 3 Dots Menu Button */}
-                  <button
-                    onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                    style={{ 
-                      position: 'absolute', 
-                      top: '0.5rem', 
-                      right: '0.5rem', 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#9CA3AF', 
-                      fontSize: '1.5rem', 
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      borderRadius: '0.25rem',
-                      lineHeight: '1'
-                    }}
-                    aria-label="Ticket options"
-                  >
-                    ⋮
-                  </button>
+          {/* Single Rolling List */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {/* LIVE Section */}
+            {filteredLive.length > 0 && (
+              <>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#06B6D4', margin: '1.5rem 0 1rem' }}>
+                  LIVE ({filteredLive.length})
+                </h2>
+{filteredLive.map((t) => {
+  const currentETA = calculateCurrentETA(t);
+  const delayInfo = getDelayInfo(t, currentETA);
 
-                  {/* Dropdown Menu */}
-                  {openMenuId === t.id && (
-                    <div 
-                      className="menu-dropdown" 
-                      style={{ 
-                        position: 'absolute', 
-                        top: '2.5rem', 
-                        right: '0.5rem', 
-                        backgroundColor: '#1F2937', 
-                        borderRadius: '0.5rem', 
-                        boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
-                        zIndex: 50,
-                        minWidth: '140px',
-                        border: '1px solid #4B5563'
-                      }}
-                    >
-                      <button
-                        onClick={() => {
-                          alert('Edit ticket — coming soon! 🚧');
-                          setOpenMenuId(null);
-                        }}
-                        style={{ 
-                          display: 'block', 
-                          width: '100%', 
-                          padding: '0.75rem 1rem', 
-                          background: 'none', 
-                          border: 'none', 
-                          color: '#E5E7EB', 
-                          textAlign: 'left', 
-                          cursor: 'pointer',
-                          fontSize: '0.95rem'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        ✏️ Edit
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (confirm('Permanently delete this live ticket? Driver will lose tracking.')) {
-                            try {
-                              await deleteDoc(doc(db, 'tickets', t.id));
-                              alert('Ticket deleted');
-                            } catch (err) {
-                              console.error(err);
-                              alert('Delete failed');
-                            }
-                          }
-                          setOpenMenuId(null);
-                        }}
-                        style={{ 
-                          display: 'block', 
-                          width: '100%', 
-                          padding: '0.75rem 1rem', 
-                          background: 'none', 
-                          border: 'none', 
-                          color: '#EF4444', 
-                          textAlign: 'left', 
-                          cursor: 'pointer',
-                          fontSize: '0.95rem',
-                          fontWeight: '500'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#7F1D1D'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  )}
+  return (
+    <div 
+      key={t.id} 
+      onClick={() => zoomToDriver(t)}
+      style={{ 
+        backgroundColor: highlightedId === t.id ? '#4B5563' : '#374151', 
+        padding: '1.25rem', 
+        borderRadius: '0.75rem', 
+        position: 'relative', 
+        marginBottom: '1rem',
+        cursor: 'pointer',
+        border: highlightedId === t.id ? '2px solid #06B6D4' : 'none',
+        transition: 'all 0.2s'
+      }}
+    >
+      {/* 3-dots */}
 
-                  {/* Live Ticket Content */}
-                  <p style={{ fontWeight: 'bold' }}>{t.material} — {t.qty}</p>
-                  <p style={{ fontSize: '0.875rem', color: '#D1D5DB' }}>ETA: {t.anticipatedTime || "ASAP"}</p>
-                  <button
-                    onClick={() => zoomToDriver(t)}
-                    style={{ marginTop: '0.5rem', backgroundColor: '#06B6D4', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontWeight: 'medium' }}
-                  >
-                    Zoom to Driver
-                  </button>
-                </div>
-                ))
-              )}
-            </div>
-          )}
+      <p style={{ fontWeight: 'bold' }}>{t.material} — {t.qty}</p>
 
-          {activeTab === "claimed" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {claimedWaitingTickets.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '1.25rem' }}>No claimed tickets waiting</p>
-              ) : (
-                groupByCSI(claimedWaitingTickets).map(([csi, tickets]) => (
-                  <div key={csi} style={{ backgroundColor: '#1F2937', borderRadius: '1rem', padding: '1.5rem', border: '1px solid #4B5563' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3B82F6', marginBottom: '1rem' }}>
-                      {csi === "Other" ? "Other Deliveries" : `Division ${csi}`}
+      <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
+        Agreed: <span style={{ fontWeight: 'bold' }}>{t.anticipatedTime || "ASAP"}</span>
+        {currentETA && (
+          <>
+            {' → Current: '}
+            <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
+            {delayInfo && (
+              <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                ({delayInfo.text})
+              </span>
+            )}
+          </>
+        )}
+      </p>
+
+      <button onClick={(e) => { e.stopPropagation(); zoomToDriver(t); }} /* style */>
+        Zoom to Driver
+      </button>
+    </div>
+  );
+})}
+              </>
+            )}
+
+            {/* CLAIMED Section */}
+            {filteredClaimed.length > 0 && (
+              <>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3B82F6', margin: '2rem 0 1rem' }}>
+                  CLAIMED ({filteredClaimed.length})
+                </h2>
+                {groupByCSI(filteredClaimed).map(([csi, tickets]) => (
+                  <div key={csi}>
+                    <h3 style={{ fontSize: '1.125rem', color: '#60A5FA', margin: '1rem 0 0.5rem' }}>
+                      {csi === "Other" ? "Other" : `Division ${csi}`}
                     </h3>
-                    <div style={{ display: 'grid', gap: '1rem' }}>
-                      {tickets.map((t) => (
-                      <div 
-                        key={t.id} 
-                        style={{ 
-                          backgroundColor: '#374151', 
-                          padding: '1.25rem', 
-                          borderRadius: '0.75rem', 
-                          position: 'relative'
-                        }}
-                      >
-                        {/* Same 3-dots button and menu as above — copy exactly */}
-                        <button
-                          onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                    {tickets.map((t) => {
+                      // Variables must be inside the arrow function
+                      const currentETA = null; // No real-time location yet
+                      const delayInfo = null;
+
+                      return (
+                        <div 
+                          key={t.id} 
                           style={{ 
-                            position: 'absolute', 
-                            top: '0.5rem', 
-                            right: '0.5rem', 
-                            background: 'none', 
-                            border: 'none', 
-                            color: '#9CA3AF', 
-                            fontSize: '1.5rem', 
-                            cursor: 'pointer',
-                            padding: '0.25rem',
-                            borderRadius: '0.25rem',
-                            lineHeight: '1'
+                            backgroundColor: '#374151', 
+                            padding: '1.25rem', 
+                            borderRadius: '0.75rem', 
+                            position: 'relative', 
+                            marginBottom: '1rem' 
                           }}
-                          aria-label="Ticket options"
                         >
-                          ⋮
-                        </button>
+                          {/* Your 3-dots menu here */}
 
-                        {openMenuId === t.id && (
-                          <div className="menu-dropdown" style={{ /* same styles as above */ }}>
-                            {/* Same Edit and Delete buttons — copy from Live */ }
-                            <button onClick={() => { alert('Edit ticket — coming soon! 🚧'); setOpenMenuId(null); }} /* ... */ >✏️ Edit</button>
-                            <button onClick={async () => { if (confirm('Delete this claimed ticket?')) { await deleteDoc(doc(db, 'tickets', t.id)); } setOpenMenuId(null); }} /* ... */ >🗑️ Delete</button>
-                          </div>
-                        )}
+                          <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
+                            {t.material} — {t.qty}
+                          </p>
+                          <p style={{ color: '#D1D5DB' }}>{t.projectName}</p>
 
-                        {/* Claimed Content */}
-                        <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
-                          {t.material} — {t.qty}
-                        </p>
-                        <p style={{ color: '#D1D5DB', marginTop: '0.25rem' }}>{t.projectName}</p>
-                        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
-                          ETA: {t.anticipatedTime || "ASAP"}
-                        </p>
-                      </div>
-                      ))}
-                    </div>
+                          {/* Enhanced ETA line */}
+                          <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
+                            Agreed: <span style={{ fontWeight: 'bold' }}>{t.anticipatedTime || "ASAP"}</span>
+                            {currentETA && (
+                              <>
+                                {' → Current: '}
+                                <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
+                                {delayInfo && (
+                                  <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                                    ({delayInfo.text})
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </>
+            )}
 
-          {activeTab === "unclaimed" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {unclaimedTickets.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '1.875rem' }}>No unclaimed tickets</p>
-              ) : (
-                groupByCSI(unclaimedTickets).map(([csi, tickets]) => (
-                  <div key={csi} style={{ backgroundColor: '#1F2937', borderRadius: '1rem', padding: '1.5rem', border: '1px solid #4B5563' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3B82F6', marginBottom: '1rem' }}>
-                      {csi === "Other" ? "Other Deliveries" : `Division ${csi}`}
+            {/* UNCLAIMED Section */}
+            {filteredUnclaimed.length > 0 && (
+              <>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#EAB308', margin: '2rem 0 1rem' }}>
+                  UNCLAIMED ({filteredUnclaimed.length})
+                </h2>
+                {groupByCSI(filteredUnclaimed).map(([csi, tickets]) => (
+                  <div key={csi}>
+                    <h3 style={{ fontSize: '1.125rem', color: '#FBBF24', margin: '1rem 0 0.5rem' }}>
+                      {csi === "Other" ? "Other" : `Division ${csi}`}
                     </h3>
-                    <div style={{ display: 'grid', gap: '1rem' }}>
-                    {tickets.map((t) => (
-                      <div 
-                        key={t.id} 
-                        style={{ 
-                          backgroundColor: '#374151', 
-                          padding: '1.25rem', 
-                          borderRadius: '0.75rem', 
-                          position: 'relative'  // Important: needed for absolute menu positioning
-                        }}
-                      >
-                        {/* 3 Dots Menu Button */}
-                        <button
-                          onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                          style={{ 
-                            position: 'absolute', 
-                            top: '0.5rem', 
-                            right: '0.5rem', 
-                            background: 'none', 
-                            border: 'none', 
-                            color: '#9CA3AF', 
-                            fontSize: '1.5rem', 
-                            cursor: 'pointer',
-                            padding: '0.25rem',
-                            borderRadius: '0.25rem',
-                            lineHeight: '1'
-                          }}
-                          aria-label="Ticket options"
-                        >
-                          ⋮
-                        </button>
+                    {tickets.map((t) => {
+                      const currentETA = null;
+                      const delayInfo = null;
 
-                        {/* Dropdown Menu */}
-                        {openMenuId === t.id && (
-                          <div 
-                            className="menu-dropdown" 
+                      return (
+                        <div 
+                          key={t.id} 
+                          style={{ 
+                            backgroundColor: '#374151', 
+                            padding: '1.25rem', 
+                            borderRadius: '0.75rem', 
+                            position: 'relative', 
+                            marginBottom: '1rem' 
+                          }}
+                        >
+                          {/* Your 3-dots menu here */}
+
+                          <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308' }}>
+                            {t.material} — {t.qty}
+                          </p>
+                          <p style={{ color: '#D1D5DB' }}>{t.projectName}</p>
+
+                          {/* Enhanced ETA line */}
+                          <p style={{ fontSize: '0.875rem', color: '#D1D5DB', margin: '0.5rem 0' }}>
+                            Agreed: <span style={{ fontWeight: 'bold' }}>{t.anticipatedTime || "ASAP"}</span>
+                            {currentETA && (
+                              <>
+                                {' → Current: '}
+                                <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
+                                {delayInfo && (
+                                  <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                                    ({delayInfo.text})
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </p>
+
+                          {/* Copy Driver Link Button */}
+                          <button
+                            onClick={async () => {
+                              const url = `${window.location.origin}/driver?ticketId=${t.shortId || t.id}`;
+                              try {
+                                await navigator.clipboard.writeText(url);
+                                alert("Link copied!");
+                              } catch {
+                                prompt("Copy link:", url);
+                              }
+                            }}
                             style={{ 
-                              position: 'absolute', 
-                              top: '2.5rem', 
-                              right: '0.5rem', 
-                              backgroundColor: '#1F2937', 
-                              borderRadius: '0.5rem', 
-                              boxShadow: '0 8px 25px rgba(0,0,0,0.4)', 
-                              zIndex: 50,
-                              minWidth: '140px',
-                              border: '1px solid #4B5563'
+                              marginTop: '1rem', 
+                              width: '100%', 
+                              backgroundColor: '#CA8A04', 
+                              color: 'white', 
+                              padding: '0.5rem', 
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              cursor: 'pointer'
                             }}
                           >
-                            <button
-                              onClick={() => {
-                                alert('Edit ticket — coming soon! 🚧');
-                                setOpenMenuId(null);
-                              }}
-                              style={{ 
-                                display: 'block', 
-                                width: '100%', 
-                                padding: '0.75rem 1rem', 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#E5E7EB', 
-                                textAlign: 'left', 
-                                cursor: 'pointer',
-                                fontSize: '0.95rem'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                              ✏️ Edit
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (confirm('Permanently delete this ticket? This cannot be undone.')) {
-                                  try {
-                                    await deleteDoc(doc(db, 'tickets', t.id));
-                                    alert('Ticket deleted successfully');
-                                  } catch (err) {
-                                    console.error('Delete failed:', err);
-                                    alert('Failed to delete ticket');
-                                  }
-                                }
-                                setOpenMenuId(null);
-                              }}
-                              style={{ 
-                                display: 'block', 
-                                width: '100%', 
-                                padding: '0.75rem 1rem', 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#EF4444', 
-                                textAlign: 'left', 
-                                cursor: 'pointer',
-                                fontSize: '0.95rem',
-                                fontWeight: '500'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#7F1D1D'}
-                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Ticket Content */}
-                        <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#EAB308', margin: '0 0 0.5rem 0' }}>
-                          {t.material} — {t.qty}
-                        </p>
-                        <p style={{ color: '#D1D5DB', margin: '0.25rem 0' }}>{t.projectName}</p>
-                        <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: '0.5rem 0' }}>
-                          ETA: {t.anticipatedTime || "ASAP"}
-                        </p>
-
-                        {/* Copy Driver Link Button */}
-                        <button
-                          onClick={async () => {
-                            const url = `${window.location.origin}/driver?ticketId=${t.shortId || t.id}`;
-                            try {
-                              await navigator.clipboard.writeText(url);
-                              alert("Link copied!");
-                            } catch {
-                              prompt("Copy link:", url);
-                            }
-                          }}
-                          style={{ 
-                            marginTop: '1rem', 
-                            width: '100%', 
-                            backgroundColor: '#CA8A04', 
-                            color: 'white', 
-                            padding: '0.5rem', 
-                            borderRadius: '0.5rem', 
-                            fontWeight: 'medium',
-                            border: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Copy Driver Link
-                        </button>
-                      </div>
-                    ))}
-                    </div>
+                            Copy Driver Link
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </>
+            )}
+
+            {/* Empty State */}
+            {filteredLive.length === 0 && filteredClaimed.length === 0 && filteredUnclaimed.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '1.5rem', marginTop: '4rem' }}>
+                No tickets match filter
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Right Pane: Map */}
