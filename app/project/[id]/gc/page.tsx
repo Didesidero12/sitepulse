@@ -469,7 +469,23 @@ useEffect(() => {
       >
         + Quick Ticket
       </button>
-</div>
+
+{/* NEW: Digital Whiteboard Button */}
+    <button
+      onClick={() => window.location.href = `/project/${projectId || id}/digital-whiteboard`}
+      style={{ 
+        backgroundColor: '#4F46E5', 
+        color: 'white', 
+        fontSize: '1rem', 
+        fontWeight: 'bold', 
+        padding: '0.75rem 1.5rem', 
+        borderRadius: '0.75rem',
+        boxShadow: '0 4px 14px rgba(79, 70, 229, 0.4)'
+      }}
+    >
+      📋 Digital Whiteboard
+    </button>
+  </div>
 
       {/* Main Content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
