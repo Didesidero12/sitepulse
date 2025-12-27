@@ -351,6 +351,8 @@ useEffect(() => {
   };
 }, [tracking, currentPos, heading, bearingMode]);
 
+
+
 // TICKET LOADING — RESOLVES shortId OR real ticketId, THEN REALTIME LISTEN
 useEffect(() => {
   const rawId = searchParams.get('ticketId');
