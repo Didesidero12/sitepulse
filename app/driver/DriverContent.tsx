@@ -483,19 +483,33 @@ useEffect(() => {
 
 useLayoutEffect(() => {
   if (tracking && sheetRef.current) {
-    // Primary snap
-    requestAnimationFrame(() => {
-      sheetRef.current.snapTo(0);
-    });
+    // Immediate
+    sheetRef.current.snapTo(0);
 
-    // Fallback in case animation hasn't settled
+    // After tick
     setTimeout(() => {
       if (tracking && sheetRef.current) {
         sheetRef.current.snapTo(0);
       }
-    }, 300);
+    }, 100);
+
+    // Final insurance
+    setTimeout(() => {
+      if (tracking && sheetRef.current) {
+        sheetRef.current.snapTo(0);
+      }
+    }, 500);
   }
 }, [tracking]);
+
+useEffect(() => {
+  if (sheetRef.current) {
+    // Force half on mount
+    setTimeout(() => {
+      sheetRef.current.snapTo(1);
+    }, 300);  // small delay after mount
+  }
+}, []);
 
 const handleStop = async () => {
   if (ticket?.id) {
@@ -711,40 +725,89 @@ initialViewState={{
   </div>
 )}
 
-{/* Bottom Sheet - Only render after mount to avoid hydration mismatch */}
-    {isMounted ? (
-      <Sheet
-      ref={sheetRef}
-      isOpen={true}
-      onClose={() => {}}
-      snapPoints={[0, 0.5, 1]}           // 0 = peek, 0.5 = half, 1 = full
-      initialSnap={1}                    // ← CHANGE TO 1 → starts at half-mast (0.5)
-      onSnap={(index) => setSheetSnap(index)}
-      disableDismiss={true}
-      disableDrag={false}
-    >
-      <Sheet.Container>
-    {/* REMOVE <Sheet.Header /> completely — no extra line */}
+{/* Bottom Sheet - Only render on client to avoid hydration mismatch */}
+{isMounted ? (
+  <Sheet
+    ref={sheetRef}
+    isOpen={true}
+    onClose={() => {}}
+    snapPoints={[0, 0.15, 0.5, 1]}  // Peek (120px), half, full — adjust peek as needed
+    initialSnap={1.0}  // Starts at half-open
+    onSnap={(index) => setSheetSnap(index)}
+    onOpenEnd={() => {
+      // Reliable post-mount snap to half
+      if (sheetRef.current) sheetRef.current.snapTo(1);
+    }}
+    disableDismiss={true}
+    disableDrag={false}
+  >
+    <Sheet.Container>
+      <Sheet.Content>
+        <div style={{ padding: '12px', paddingTop: 8 }}>
+          {/* Drag Handle — ALWAYS FIRST for peek visibility */}
+          <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+            <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
+          </div>
 
-<Sheet.Content>
-  <div style={{ padding: '12px', paddingTop: 8 }}>
-    {/* Drag Handle */}
-    <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
-      <div style={{ width: '40px', height: '4px', background: '#aaa', margin: '0 auto', borderRadius: '2px' }} />
-    </div>
+          {/* ETA + Start/Stop Bar — only when claimed */}
+          {claimed && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem',
+              backgroundColor: '#1F2937',
+              borderRadius: '1rem',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ color: 'white' }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 'bold' }}>
+                  {etaMinutes !== null ? `${etaMinutes} min` : '--'} • {distanceMiles !== null ? `${distanceMiles} mi` : '--'}
+                </div>
+                <div style={{ fontSize: '1.1rem', color: '#9CA3AF' }}>
+                  Arrive ~ {arrivalTime}
+                </div>
+              </div>
+              <button
+                onClick={tracking ? handleStop : async () => {
+                  if (!ticket?.id) return;
+                  try {
+                    await updateDoc(doc(db, 'tickets', ticket.id), {
+                      status: 'claimed-tracking',
+                    });
+                    setTracking(true);
+                  } catch (err) {
+                    alert('Failed to start tracking');
+                  }
+                }}
+                style={{
+                  padding: '1rem 2rem',
+                  backgroundColor: tracking ? '#DC2626' : '#16A34A',
+                  color: 'white',
+                  borderRadius: '9999px',
+                  fontWeight: 'bold',
+                  fontSize: '1.4rem',
+                  minWidth: '160px'
+                }}
+              >
+                {tracking ? 'Stop Tracking' : 'Start Tracking'}
+              </button>
+            </div>
+          )}
 
-{/* CLAIM QUESTIONS — shown only when not claimed */}
-    {!claimed && ticket && (
-      <div style={{
-        background: '#1e293b',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-        border: '1px solid #334155'
-      }}>
-        <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#FBBF24' }}>
-          Confirm Your Delivery
-        </h3>
+          {/* CLAIM QUESTIONS — shown only when not claimed */}
+          {!claimed && ticket && (
+            <div style={{
+              background: '#1e293b',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '20px',
+              border: '1px solid #334155'
+            }}>
+              <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#FBBF24' }}>
+                Confirm Your Delivery
+              </h3>
 
         {/* Vehicle Type */}
         <div style={{ marginBottom: '1.5rem' }}>
@@ -865,17 +928,17 @@ initialViewState={{
       </div>
     )}
 
-        {/* TICKET SUMMARY + BUTTONS — FINAL, PERFECT, BUTTONS ON RIGHT */}
-        <div style={{
-          background: '#f3f4f6',
-          borderRadius: '12px',
-          padding: '16px',
-          marginTop: '16px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: '20px',
-        }}>
+{/* TICKET SUMMARY + BUTTONS */}
+          <div style={{
+            background: '#f3f4f6',
+            borderRadius: '12px',
+            padding: '16px',
+            marginTop: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '20px',
+          }}>
           {/* LEFT: ALL TICKET INFO */}
           <div style={{ flex: 1, fontSize: '15px', lineHeight: '1.6' }}>
             {ticket?.csiDivision && (
@@ -963,79 +1026,49 @@ initialViewState={{
             >
               {claimed ? 'Unclaim Delivery' : 'Claim Delivery'}
             </button>
-
-            {claimed && !tracking && (
-              <button
-                onClick={async () => {
-                  if (!ticket?.id) {
-                    alert('Ticket not loaded yet — try again in a second');
-                    return;
-                  }
-
-                  try {
-                    // Update Firestore status so War Room moves it to Live tab
-                    await updateDoc(doc(db, 'tickets', ticket.id), {
-                      status: 'claimed-tracking',
-                    });
-                    console.log('Status updated to claimed-tracking');
-                  } catch (err) {
-                    console.error('Failed to update status:', err);
-                    alert('Failed to start tracking — check connection');
-                    return; // don't start local tracking if Firestore fails
-                  }
-
-                  // Only after successful Firestore write, start local tracking
-                  setTracking(true);
-                }}
-                style={{
-                  padding: '16px 40px',
-                  fontSize: '20px',
-                  fontWeight: 'bold',
-                  color: 'white',
-                  background: '#16a34a',
-                  border: 'none',
-                  borderRadius: '30px',
-                  minWidth: '240px',
-                  boxShadow: '0 8px 28px rgba(22,163,74,0.5)',
-                }}
-              >
-                Start Navigation
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Turn-by-turn */}
-        {sheetSnap === 0 && instructions.length > 0 && (
-          <div style={{ marginTop: '20px', padding: '0 4px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold' }}>
-              Turn-by-Turn Directions
-            </h3>
-            <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '15px', lineHeight: '1.6' }}>
-              {instructions.map((inst, i) => (
-                <li key={i} style={{ marginBottom: '10px', color: i === 0 ? '#2563eb' : '#333', fontWeight: i === 0 ? 'bold' : 'normal' }}>
-                  {inst}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-      </div>
-</Sheet.Content>
-        </Sheet.Container>
-        <Sheet.Backdrop onTap={() => sheetRef.current?.snapTo(1)} />  {/* optional: tap backdrop to reopen half */}
-      </Sheet>
-    ) : (
-      // Placeholder during SSR — prevents layout shift and hydration error
-      <div style={{ 
-        height: '50vh', 
-        backgroundColor: '#f3f4f6',
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-      }} />
-    )}
+{/* Turn-by-turn — shows in peek (scrollable if needed) */}
+          {sheetSnap === 0 && instructions.length > 0 && (
+            <div style={{ marginTop: '20px', padding: '0 4px' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 'bold' }}>
+                Turn-by-Turn Directions
+              </h3>
+              <ol style={{ margin: 0, paddingLeft: '24px', fontSize: '15px', lineHeight: '1.6' }}>
+                {instructions.map((inst, i) => (
+                  <li key={i} style={{ marginBottom: '10px', color: i === 0 ? '#2563eb' : '#333', fontWeight: i === 0 ? 'bold' : 'normal' }}>
+                    {inst}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      </Sheet.Content>
+    </Sheet.Container>
+    <Sheet.Backdrop />
+  </Sheet>
+) : (
+  // Placeholder during SSR — matches peeked styles to prevent layout shift
+  <div style={{
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '120px',  // Match peek height
+    backgroundColor: '#fff',
+    borderTopLeftRadius: '8px',
+    borderTopRightRadius: '8px',
+    boxShadow: '0px -2px 16px rgba(0, 0, 0, 0.3)',
+    pointerEvents: 'none',  // Don't block map
+  }}>
+    {/* Optional subtle loader */}
+    <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+      Loading sheet...
+    </div>
+  </div>
+)}
   
       {/* Global Style for Touch Pass-Through */}
       <style jsx global>{`

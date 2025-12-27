@@ -82,33 +82,57 @@ const calculateCurrentETA = (ticket: Ticket): string | null => {
   });
 };
 
-// Calculate delay in minutes
 const getDelayInfo = (ticket: Ticket, currentETA: string | null) => {
   if (!ticket.anticipatedTime || !currentETA) return null;
 
-  // Parse anticipated time (assumes format like "10:30 AM")
-  const [time, period] = ticket.anticipatedTime.split(' ');
-  let [hours, minutes] = time.split(':').map(Number);
-  if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
-  if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+  const anticipated = ticket.anticipatedTime.trim().toUpperCase();
+  const match = anticipated.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return null;
+
+  let [, hoursStr, minutesStr, period] = match;
+  let hours = parseInt(hoursStr, 10);
+  const minutes = parseInt(minutesStr, 10);
+
+  if (isNaN(hours) || isNaN(minutes)) return null;
+
+  period = period || 'AM';
+
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
 
   const anticipatedDate = new Date();
   anticipatedDate.setHours(hours, minutes, 0, 0);
 
-  // Parse current ETA
+  const currentMatch = currentETA.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!currentMatch) return null;
+
+  const [, cHoursStr, cMinutesStr, cPeriod] = currentMatch;
+  let cHours = parseInt(cHoursStr, 10);
+  const cMinutes = parseInt(cMinutesStr, 10);
+
+  if (cPeriod === 'PM' && cHours !== 12) cHours += 12;
+  if (cPeriod === 'AM' && cHours === 12) cHours = 0;
+
   const currentDate = new Date();
-  const [currentTime, currentPeriod] = currentETA.split(' ');
-  let [currentHours, currentMinutes] = currentTime.split(':').map(Number);
-  if (currentPeriod.toUpperCase() === 'PM' && currentHours !== 12) currentHours += 12;
-  if (currentPeriod.toUpperCase() === 'AM' && currentHours === 12) currentHours = 0;
-  currentDate.setHours(currentHours, currentMinutes, 0, 0);
+  currentDate.setHours(cHours, cMinutes, 0, 0);
 
   const diffMinutes = Math.round((currentDate.getTime() - anticipatedDate.getTime()) / 60000);
+  const absMinutes = Math.abs(diffMinutes);
+
+  const hoursDiff = Math.floor(absMinutes / 60);
+  const minsDiff = absMinutes % 60;
+
+  const formattedDelay = hoursDiff > 0 
+    ? `${hoursDiff} h${minsDiff > 0 ? ` ${minsDiff} min` : ''}` 
+    : `${minsDiff} min`;
 
   return {
     minutes: diffMinutes,
-    text: diffMinutes > 0 ? `${diffMinutes} min behind` : 
-          diffMinutes < 0 ? `${Math.abs(diffMinutes)} min early` : 'on time',
+    text: diffMinutes > 0 
+      ? `${formattedDelay} behind` 
+      : diffMinutes < 0 
+        ? `${formattedDelay} early` 
+        : 'on time',
     color: diffMinutes > 15 ? '#EF4444' : diffMinutes > 0 ? '#FBBF24' : '#22C55E'
   };
 };
@@ -548,11 +572,11 @@ useEffect(() => {
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#06B6D4', margin: '1.5rem 0 1rem' }}>
                   LIVE ({filteredLive.length})
                 </h2>
-{filteredLive.map((t) => {
-  const currentETA = calculateCurrentETA(t);
-  const delayInfo = getDelayInfo(t, currentETA);
+              {filteredLive.map((t) => {
+                const currentETA = calculateCurrentETA(t);
+                const delayInfo = getDelayInfo(t, currentETA);
 
-  return (
+                return (
               <div 
                 key={t.id} 
                 onClick={() => zoomToDriver(t)}
@@ -698,7 +722,12 @@ useEffect(() => {
                       {' → Current: '}
                       <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
                       {delayInfo && (
-                        <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                        <span style={{ 
+                          color: delayInfo.color, 
+                          marginLeft: '0.75rem', 
+                          fontWeight: '600',
+                          fontSize: '1rem'
+                        }}>
                           ({delayInfo.text})
                         </span>
                       )}
@@ -874,7 +903,12 @@ useEffect(() => {
                                 {' → Current: '}
                                 <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
                                 {delayInfo && (
-                                  <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                                  <span style={{ 
+                                    color: delayInfo.color, 
+                                    marginLeft: '0.5rem', 
+                                    fontWeight: '600',
+                                    fontSize: '0.95rem'
+                                  }}>
                                     ({delayInfo.text})
                                   </span>
                                 )}
@@ -1047,7 +1081,12 @@ useEffect(() => {
                                 {' → Current: '}
                                 <span style={{ fontWeight: 'bold' }}>{currentETA}</span>
                                 {delayInfo && (
-                                  <span style={{ color: delayInfo.color, marginLeft: '0.5rem', fontWeight: '500' }}>
+                                  <span style={{ 
+                                    color: delayInfo.color, 
+                                    marginLeft: '0.75rem', 
+                                    fontWeight: '600',
+                                    fontSize: '1rem'
+                                  }}>
                                     ({delayInfo.text})
                                   </span>
                                 )}
